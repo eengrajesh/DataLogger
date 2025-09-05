@@ -49,4 +49,4 @@ if __name__ == "__main__":
             else:
                 print("No open ports found in the specified range.")
     else:
-        print(f"Failed to connect to {pi_ip}")
+        print(f"Failed to connect to {pi_ip}") 
