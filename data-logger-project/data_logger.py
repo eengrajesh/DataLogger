@@ -4,16 +4,22 @@ import threading as th
 import sys
 import shutil
 from datetime import datetime
-from database import add_reading, init_db
+from database_manager import DatabaseManager
+from storage_manager import StorageManager
 from calibration import apply_correction
+from config import config
 
 # --- Hardware Section ---
 daq = sm_tc.SMtc(0, 1)
 
+# --- Database and Storage ---
+db_manager = DatabaseManager()
+storage_manager = StorageManager()
+
 # --- Configuration ---
 NUMBER_OF_CHANNELS = 8
-SAMPLE_INTERVAL_SECONDS = 5
-sensor_intervals = {i: 5 for i in range(1, NUMBER_OF_CHANNELS + 1)} # Default 5s
+SAMPLE_INTERVAL_SECONDS = config.get('logging.default_interval', 5)
+sensor_intervals = {i: SAMPLE_INTERVAL_SECONDS for i in range(1, NUMBER_OF_CHANNELS + 1)}
 
 # --- Logging Control ---
 logging_thread = None
@@ -81,7 +87,7 @@ def log_temperatures():
                         temp = daq.get_temp(i)
                         if temp is not None:
                             corrected_temp = apply_correction(i, temp)
-                            add_reading(thermocouple_id=i, temperature=corrected_temp)
+                            db_manager.insert_reading(thermocouple_id=i, temperature=corrected_temp)
                             print(f"Logged: Ch {i}, Temp: {corrected_temp:.2f}°C, Int: {interval}s")
                             last_log_time[i] = current_time
                         else:
@@ -99,7 +105,6 @@ def log_temperatures():
 
 def start_logging_thread():
     global logging_thread
-    init_db()
     if logging_thread is None or not logging_thread.is_alive():
         logging_stop_event.clear()
         logging_thread = th.Thread(target=log_temperatures, daemon=True)
