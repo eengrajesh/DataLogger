@@ -1,6 +1,10 @@
-from flask import Flask, render_template, jsonify, request, send_file
+from flask import Flask, render_template, jsonify, request, send_file, send_from_directory
 from database_manager import DatabaseManager
 from storage_manager import StorageManager
+from text_file_logger import text_file_logger
+from notification_system import notification_system, AlertLevel
+from gpio_controller import GPIOController
+from telegram_bot import TelegramBot
 from data_logger import (
     start_logging_thread, stop_logging_thread, daq, 
     get_board_info, connect, disconnect, 
@@ -21,6 +25,15 @@ app = Flask(__name__)
 db_manager = DatabaseManager()
 storage_manager = StorageManager()
 
+# Initialize GPIO controller and Telegram bot
+gpio_controller = None
+telegram_bot = None
+
+# Create static directory if it doesn't exist
+static_dir = os.path.join(os.path.dirname(__file__), 'static')
+if not os.path.exists(static_dir):
+    os.makedirs(static_dir)
+
 # Route to serve the enhanced dashboard
 @app.route('/')
 def index():
@@ -30,6 +43,12 @@ def index():
 @app.route('/classic')
 def classic():
     return render_template('index.html')
+
+# Route to serve static files (logo, etc.)
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    static_path = os.path.join(os.path.dirname(__file__), 'static')
+    return send_from_directory(static_path, filename)
 
 # ============= Connection Management =============
 @app.route('/api/connect', methods=['POST'])
@@ -207,6 +226,118 @@ def api_clear_data():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ============= Text File Data Operations =============
+@app.route('/api/textfiles/export_csv', methods=['POST'])
+def api_export_csv_from_textfiles():
+    """Generate CSV export from text files with filtering options"""
+    try:
+        data = request.get_json()
+        
+        # Parse parameters
+        start_date_str = data.get('start_date')
+        end_date_str = data.get('end_date')
+        channels = data.get('channels', [])  # List of channel numbers
+        include_raw = data.get('include_raw', False)
+        
+        if not start_date_str or not end_date_str:
+            return jsonify({"error": "start_date and end_date are required"}), 400
+        
+        start_date = datetime.fromisoformat(start_date_str)
+        end_date = datetime.fromisoformat(end_date_str)
+        
+        # Generate CSV export
+        export_path = text_file_logger.generate_csv_export(
+            start_date, end_date, channels if channels else None, include_raw
+        )
+        
+        if export_path:
+            return send_file(
+                export_path,
+                as_attachment=True,
+                download_name=f'temperature_data_{start_date.strftime("%Y%m%d")}_{end_date.strftime("%Y%m%d")}.csv',
+                mimetype='text/csv'
+            )
+        else:
+            return jsonify({"error": "Failed to generate CSV export"}), 500
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/textfiles/data_range', methods=['POST'])
+def api_get_textfile_data_range():
+    """Get data from text files for a specific date range"""
+    try:
+        data = request.get_json()
+        
+        start_date_str = data.get('start_date')
+        end_date_str = data.get('end_date')
+        channels = data.get('channels', None)
+        
+        if not start_date_str or not end_date_str:
+            return jsonify({"error": "start_date and end_date are required"}), 400
+        
+        start_date = datetime.fromisoformat(start_date_str)
+        end_date = datetime.fromisoformat(end_date_str)
+        
+        readings = text_file_logger.get_readings_by_date_range(start_date, end_date, channels)
+        
+        # Convert datetime objects to strings for JSON serialization
+        for reading in readings:
+            reading['timestamp'] = reading['timestamp'].isoformat()
+        
+        return jsonify({
+            "readings": readings,
+            "count": len(readings),
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/textfiles/stats')
+def api_textfile_storage_stats():
+    """Get statistics about text file storage"""
+    try:
+        stats = text_file_logger.get_storage_stats()
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/textfiles/maintenance', methods=['POST'])
+def api_textfile_maintenance():
+    """Manually trigger text file maintenance operations"""
+    try:
+        operation = request.json.get('operation', 'all')
+        
+        results = {"operations": []}
+        
+        if operation in ['all', 'consolidate']:
+            try:
+                text_file_logger.consolidate_daily_file()
+                results["operations"].append({"consolidate": "success"})
+            except Exception as e:
+                results["operations"].append({"consolidate": f"error: {e}"})
+        
+        if operation in ['all', 'cleanup']:
+            try:
+                text_file_logger.cleanup_old_files()
+                results["operations"].append({"cleanup": "success"})
+            except Exception as e:
+                results["operations"].append({"cleanup": f"error: {e}"})
+        
+        if operation in ['all', 'compress']:
+            try:
+                text_file_logger.compress_old_files()
+                results["operations"].append({"compress": "success"})
+            except Exception as e:
+                results["operations"].append({"compress": f"error: {e}"})
+        
+        return jsonify(results)
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # ============= Logging Control =============
 @app.route('/api/logging/start', methods=['POST'])
 def api_start_logging():
@@ -330,6 +461,35 @@ def api_system_status():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/cpu_temperature')
+def api_cpu_temperature():
+    try:
+        cpu_temp_data = get_cpu_temperature()
+        temp = cpu_temp_data.get('cpu_temp', -1)
+        
+        # Define temperature thresholds
+        warning_threshold = 70
+        critical_threshold = 80
+        
+        status = "normal"
+        if temp > 0:
+            if temp >= critical_threshold:
+                status = "critical"
+            elif temp >= warning_threshold:
+                status = "warning"
+        else:
+            status = "unavailable"
+            
+        return jsonify({
+            "temperature": temp,
+            "status": status,
+            "warning_threshold": warning_threshold,
+            "critical_threshold": critical_threshold,
+            "unit": "°C"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e), "temperature": -1, "status": "error"}), 500
+
 @app.route('/api/config')
 def api_get_config():
     try:
@@ -344,6 +504,125 @@ def api_update_config():
         for key, value in data.items():
             config.set(key, value)
         return jsonify({"success": True, "config": config.config})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ============= Email Notification System =============
+@app.route('/api/notifications/config')
+def api_get_notification_config():
+    """Get current notification configuration"""
+    try:
+        return jsonify(notification_system.config)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/notifications/config', methods=['POST'])
+def api_update_notification_config():
+    """Update notification configuration"""
+    try:
+        new_config = request.get_json()
+        notification_system.update_config(new_config)
+        return jsonify({"status": "success", "message": "Configuration updated"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/notifications/test', methods=['POST'])
+def api_test_notifications():
+    """Send a test email notification"""
+    try:
+        data = request.get_json() or {}
+        recipient = data.get('recipient')
+        
+        if notification_system.test_email(recipient):
+            return jsonify({"status": "success", "message": "Test email sent successfully"})
+        else:
+            return jsonify({"status": "error", "message": "Failed to send test email"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/notifications/start', methods=['POST'])
+def api_start_notifications():
+    """Start the notification system"""
+    try:
+        if notification_system.start():
+            return jsonify({"status": "success", "message": "Notification system started"})
+        else:
+            return jsonify({"status": "info", "message": "Notification system already running"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/notifications/stop', methods=['POST'])
+def api_stop_notifications():
+    """Stop the notification system"""
+    try:
+        notification_system.stop()
+        return jsonify({"status": "success", "message": "Notification system stopped"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/notifications/status')
+def api_notification_status():
+    """Get notification system status"""
+    try:
+        connectivity = notification_system.connectivity.get_connectivity_status()
+        return jsonify({
+            "running": notification_system.is_running,
+            "enabled": notification_system.config['enabled'],
+            "connectivity": connectivity,
+            "queue_size": notification_system.alert_queue.qsize(),
+            "sent_alerts_count": len(notification_system.sent_alerts),
+            "last_cpu_temp": notification_system.last_cpu_temp,
+            "last_disk_usage": notification_system.last_disk_usage
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/notifications/alert', methods=['POST'])
+def api_create_alert():
+    """Create a custom alert"""
+    try:
+        data = request.get_json()
+        level = AlertLevel(data.get('level', 'info'))
+        title = data.get('title', 'Custom Alert')
+        message = data.get('message', 'No message provided')
+        alert_data = data.get('data', {})
+        
+        alert = notification_system.create_alert(level, title, message, alert_data)
+        
+        return jsonify({
+            "status": "success",
+            "message": "Alert created",
+            "alert_id": str(hash(f"{alert.title}{alert.timestamp}"))
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ============= GPIO Control =============
+@app.route('/api/gpio/status', methods=['GET'])
+def api_gpio_status():
+    """Get current GPIO button and LED status"""
+    try:
+        if gpio_controller:
+            return jsonify(gpio_controller.get_status())
+        else:
+            return jsonify({
+                "buttons": {"START": False, "SHUTDOWN": False, "EXPORT": False, "WIFI": False},
+                "leds": {"SYSTEM": False, "ERROR": False, "NETWORK": False, "LOGGING": False},
+                "platform": "not_initialized"
+            })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/gpio/led/<led_name>/<state>', methods=['POST'])
+def api_gpio_led_control(led_name, state):
+    """Manually control LED state (for testing)"""
+    try:
+        if gpio_controller and led_name.upper() in ['SYSTEM', 'ERROR', 'NETWORK', 'LOGGING']:
+            led_state = state.lower() in ['true', '1', 'on']
+            gpio_controller.set_led(led_name.upper(), led_state)
+            return jsonify({"status": f"{led_name} LED set to {led_state}"})
+        else:
+            return jsonify({"error": "GPIO controller not available or invalid LED"}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -378,4 +657,62 @@ if __name__ == '__main__':
     print(f"Access the dashboard at: http://localhost:{port}")
     print(f"Access the classic interface at: http://localhost:{port}/classic")
     
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    try:
+        # Start notification system
+        notification_system.start()
+        print("Email notification system started")
+        
+        # Initialize and start GPIO controller
+        try:
+            # Import data_logger module to pass to GPIO controller
+            import data_logger
+            
+            gpio_controller = GPIOController(
+                data_logger_module=data_logger,
+                notification_system=notification_system
+            )
+            gpio_controller.start()
+            print("GPIO controller started - physical buttons active")
+        except Exception as e:
+            print(f"GPIO controller failed to start: {e}")
+            print("Running without physical button support")
+        
+        # Initialize and start Telegram bot
+        try:
+            telegram_bot = TelegramBot(
+                data_logger_module=data_logger,
+                notification_system=notification_system,
+                gpio_controller=gpio_controller
+            )
+            
+            if telegram_bot.start():
+                print("Telegram bot started - remote access enabled")
+                print("Send /start to your bot to begin using it")
+            else:
+                print("Telegram bot failed to start - check configuration")
+                print("Edit config.py to add your bot token and user ID")
+                
+        except Exception as e:
+            print(f"Telegram bot initialization failed: {e}")
+            print("Running without Telegram bot support")
+        
+        app.run(host='0.0.0.0', port=port, debug=debug)
+        
+    except KeyboardInterrupt:
+        print("\nServer stopped by user")
+    except Exception as e:
+        print(f"Server error: {e}")
+    finally:
+        # Cleanup
+        try:
+            if telegram_bot:
+                telegram_bot.stop()
+                print("Telegram bot stopped")
+            if gpio_controller:
+                gpio_controller.cleanup()
+                print("GPIO controller cleaned up")
+            notification_system.stop()
+            stop_logging_thread()
+            print("Cleanup completed")
+        except Exception as e:
+            print(f"Cleanup error: {e}")

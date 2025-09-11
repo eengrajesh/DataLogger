@@ -1,0 +1,52 @@
+{
+  "database": {
+    "type": "sqlite",
+    "sqlite": {
+      "path": "datalogger.db"
+    },
+    "postgresql": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "datalogger",
+      "username": "",
+      "password": "",
+      "ssl_mode": "prefer"
+    }
+  },
+  "storage": {
+    "primary": "local",
+    "local_path": "./data",
+    "sd_path": "/media/sd",
+    "usb_path": "/media/usb",
+    "auto_detect": true
+  },
+  "logging": {
+    "default_interval": 5,
+    "buffer_size": 100,
+    "retention_days": 30
+  },
+  "system": {
+    "auto_start": false,
+    "web_port": 8080,
+    "debug_mode": false
+  },
+  "telegram": {
+    "bot_token": "8335298019:AAG6_ETjIY0juD_QPhQl900cxUKp7vKiF38",
+    "authorized_users": [],
+    "admin_users": [
+      6921883539
+    ],
+    "group_chat_id": null,
+    "alerts_enabled": true,
+    "alert_cooldown_minutes": 5
+  },
+  "email": {
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587,
+    "username": "",
+    "password": "",
+    "from_email": "",
+    "to_emails": [],
+    "alerts_enabled": true
+  }
+}

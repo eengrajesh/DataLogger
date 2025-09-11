@@ -36,6 +36,23 @@ class Config:
             'auto_start': False,
             'web_port': 8080,
             'debug_mode': False
+        },
+        'telegram': {
+            'bot_token': '8335298019:AAG6_ETjIY0juD_QPhQl900cxUKp7vKiF38',  # Get from @BotFather on Telegram
+            'authorized_users': [],  # List of authorized Telegram user IDs
+            'admin_users': [6921883539],  # List of admin user IDs (can authorize others)
+            'group_chat_id': None,  # Optional: group chat ID for alerts
+            'alerts_enabled': True,
+            'alert_cooldown_minutes': 5
+        },
+        'email': {
+            'smtp_server': 'smtp.gmail.com',
+            'smtp_port': 587,
+            'username': '',
+            'password': '',  # Use app password for Gmail
+            'from_email': '',
+            'to_emails': [],
+            'alerts_enabled': True
         }
     }
     

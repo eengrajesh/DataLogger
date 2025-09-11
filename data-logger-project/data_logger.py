@@ -6,6 +6,7 @@ import shutil
 from datetime import datetime
 from database_manager import DatabaseManager
 from storage_manager import StorageManager
+from text_file_logger import text_file_logger
 from calibration import apply_correction
 from config import config
 
@@ -73,6 +74,7 @@ def get_sensor_intervals():
 def log_temperatures():
     print("Data logger thread started.")
     last_log_time = {i: 0 for i in range(1, NUMBER_OF_CHANNELS + 1)}
+    last_cleanup_time = time.time()
 
     while not logging_stop_event.is_set():
         try:
@@ -87,12 +89,36 @@ def log_temperatures():
                         temp = daq.get_temp(i)
                         if temp is not None:
                             corrected_temp = apply_correction(i, temp)
+                            
+                            # Log to text file first (faster, backup)
+                            text_file_logger.log_reading(
+                                channel=i, 
+                                temperature=temp, 
+                                calibrated_temp=corrected_temp,
+                                timestamp=datetime.fromtimestamp(current_time)
+                            )
+                            
+                            # Then log to database
                             db_manager.insert_reading(thermocouple_id=i, temperature=corrected_temp)
                             print(f"Logged: Ch {i}, Temp: {corrected_temp:.2f}°C, Int: {interval}s")
                             last_log_time[i] = current_time
                         else:
                             print(f"Failed to read temp for Ch {i}. Disabling.")
                             sensor_active_status[i] = False
+
+            # Periodic maintenance (every hour)
+            if current_time - last_cleanup_time > 3600:  # 1 hour
+                try:
+                    print("[DataLogger] Performing periodic maintenance...")
+                    # Consolidate yesterday's data
+                    text_file_logger.consolidate_daily_file()
+                    # Clean up old files
+                    text_file_logger.cleanup_old_files()
+                    # Compress old files
+                    text_file_logger.compress_old_files()
+                    last_cleanup_time = current_time
+                except Exception as e:
+                    print(f"[DataLogger] Maintenance error: {e}")
 
             # Sleep for a short duration to prevent busy-waiting
             if not logging_stop_event.is_set():
@@ -124,6 +150,15 @@ def stop_logging_thread():
         return True
     print("Logging thread is not running or already stopped.")
     return False
+
+def is_logging():
+    """Check if logging thread is currently running"""
+    global logging_thread
+    return logging_thread is not None and logging_thread.is_alive()
+
+def is_connected():
+    """Check if DAQ hardware is connected"""
+    return daq is not None
 
 if __name__ == '__main__':
     print("Starting data logger as a standalone script...")
