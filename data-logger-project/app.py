@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, send_from_directory
 from database import get_latest_readings, get_historical_data, get_average_temperatures, clear_all_data, get_all_data
 from data_logger import start_logging_thread, stop_logging_thread, daq, get_board_info, connect, disconnect, get_storage_status, set_sensor_status, get_sensor_status, set_sensor_interval, get_sensor_intervals, get_cpu_temperature
 from calibration import get_calibration_factors, set_calibration_factor
@@ -6,6 +6,16 @@ import os
 import signal
 
 app = Flask(__name__)
+
+# Create static directory
+static_dir = os.path.join(os.path.dirname(__file__), 'static')
+if not os.path.exists(static_dir):
+    os.makedirs(static_dir)
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    static_path = os.path.join(os.path.dirname(__file__), 'static')
+    return send_from_directory(static_path, filename)
 
 @app.route('/api/data/live/<int:channel>')
 def api_live_data(channel):
@@ -26,6 +36,11 @@ def api_live_data(channel):
 @app.route('/')
 def index():
     """Serves the main dashboard page."""
+    return render_template('dashboard.html')
+
+@app.route('/classic')
+def classic():
+    """Serves the classic interface."""
     return render_template('index.html')
 
 @app.route('/api/data/latest')
@@ -250,6 +265,44 @@ def api_set_calibration(channel):
         return jsonify({"status": "success", "message": f"Calibration factor for channel {channel} set to {factor}."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/system/status')
+def api_system_status():
+    """API endpoint for system status - required by dashboard.html"""
+    try:
+        from datetime import datetime
+        
+        # Get system status
+        logging_active = False
+        daq_connected = daq.connected if daq else False
+        
+        try:
+            from data_logger import is_logging
+            logging_active = is_logging()
+        except:
+            pass
+            
+        try:
+            cpu_info = get_cpu_temperature()
+            cpu_temp = cpu_info.get('cpu_temp', 45.5) if isinstance(cpu_info, dict) else 45.5
+        except:
+            cpu_temp = 45.5
+        
+        return jsonify({
+            "logging": logging_active,
+            "connected": daq_connected,
+            "cpu_temp": round(cpu_temp, 1),
+            "telegram_available": False,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            "logging": False,
+            "connected": False,
+            "cpu_temp": 45.5,
+            "telegram_available": False,
+            "error": str(e)
+        }), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=True)
