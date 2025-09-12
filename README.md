@@ -1,6 +1,13 @@
 # 🌡️ DataLogger - Professional Temperature Monitoring System
 
-Complete Raspberry Pi 5 temperature data logging system with Telegram bot integration, web dashboard, and optional GPIO control.
+Complete Raspberry Pi 5 temperature data logging system with 8-channel thermocouple support, Telegram bot integration, web dashboard, and optional GPIO control.
+
+## 🆕 Latest Updates (December 2024)
+- ✅ Fixed DAQ connection handling - no phantom readings before connection
+- ✅ Added Telegram bot connect/disconnect commands
+- ✅ Improved connection status display in web interface
+- ✅ Enhanced error handling for disconnected state
+- ✅ Added connection validation before operations
 
 ## 📁 **ORGANIZED PROJECT STRUCTURE**
 
@@ -50,19 +57,22 @@ cd DataLogger
 pip install -r data-logger-project/requirements.txt --break-system-packages
 ```
 
-### Step 3: Run Production Application
+### Step 3: Configure System
 ```bash
-cd production
-cp ../data-logger-project/*.py .
-cp -r ../data-logger-project/templates .
-cp -r ../data-logger-project/sm_tc .
-python app_pi5_final.py
+# Edit configuration
+cd data-logger-project
+nano config.json  # Add your Telegram bot token and user ID
 ```
 
-### Step 4: Access Your System
-- **Telegram Bot**: @eeng_datalogger_bot
+### Step 4: Run Application
+```bash
+python app.py
+```
+
+### Step 5: Access Your System
 - **Web Dashboard**: http://your-pi-ip:8080
-- **Your User ID**: 6921883539 (pre-configured)
+- **Telegram Bot**: Your configured bot
+- Connect to DAQ: Click "Connect" button or use `/connect` in Telegram
 
 ---
 
@@ -70,17 +80,20 @@ python app_pi5_final.py
 
 ### 📱 **Remote Control via Telegram**
 - Monitor temperatures from anywhere globally  
-- Start/stop logging remotely via iPhone
+- Connect/disconnect DAQ board remotely
+- Start/stop logging remotely via any device
 - Get real-time alerts and notifications
 - Download data files instantly
-- Complete system control
+- Complete system control with inline buttons
 
 ### 🌐 **Professional Web Dashboard**
-- Real-time temperature graphs
+- Real-time temperature graphs for 8 channels
 - Historical data visualization  
+- DAQ connection management
 - System monitoring and control
 - Mobile-responsive design
-- Data export functionality
+- Data export functionality (CSV/JSON)
+- Per-channel calibration and intervals
 
 ### 🔘 **Optional Physical Control**
 - GPIO buttons for local operation
@@ -99,20 +112,65 @@ python app_pi5_final.py
 
 ## 📞 **SUPPORT & DOCUMENTATION**
 
+### 📚 Quick Reference
 - **Complete Setup**: Read `documentation/PI5_DEPLOYMENT_FINAL.md`
 - **Telegram Setup**: Follow `documentation/TELEGRAM_BOT_SETUP.md`  
 - **Hardware Guide**: Check `documentation/GPIO_HARDWARE_GUIDE.txt`
 - **Testing**: Use scripts in `testing/` folder
 
+### 🤖 Telegram Bot Commands
+```
+/start - Initialize bot and show menu
+/connect - Connect to DAQ board
+/disconnect - Disconnect from DAQ board  
+/status - System status overview
+/temps - Current temperature readings
+/logging start/stop - Control data logging
+/export 1h/24h/7d - Export data
+/help - Show all commands
+```
+
+### 🔧 Troubleshooting
+
+**Issue: Temperature shows "--.-°C" in web interface**
+- Solution: Click "Connect" button to connect to DAQ board
+
+**Issue: Cannot start logging**
+- Solution: Ensure DAQ is connected first
+
+**Issue: Telegram bot not responding**
+- Solution: Check bot token and user ID in config.json
+
+**Issue: I2C communication error on Pi5**
+- Solution: Enable I2C with `sudo raspi-config` and check connections
+
 ---
 
-## 🏆 **DEVELOPMENT STATUS**
+## 🏆 **SYSTEM SPECIFICATIONS**
 
-✅ **FULLY TESTED & WORKING**
-- Development board testing completed
-- All functionality verified
-- Pi5 compatibility confirmed
-- Ready for production deployment
+### Hardware Support
+- **DAQ Board**: Sequent Microsystems 8-Thermocouple HAT
+- **Sensors**: K-type thermocouples (supports B,E,J,K,N,R,S,T types)
+- **Channels**: 8 independent temperature channels
+- **Platform**: Raspberry Pi 5 (also works on Pi 3/4)
+- **Communication**: I2C interface
+
+### Software Features
+- **Database**: SQLite with automatic maintenance
+- **Web Server**: Flask with RESTful API
+- **Real-time Updates**: 5-second default interval (configurable per channel)
+- **Data Export**: CSV and JSON formats
+- **Calibration**: Per-channel offset correction
+- **Multi-threading**: Background logging with proper synchronization
+
+## ✅ **DEVELOPMENT STATUS**
+
+**FULLY TESTED & PRODUCTION READY**
+- ✅ Pi5 compatibility verified
+- ✅ Connection handling fixed
+- ✅ Telegram bot enhanced
+- ✅ Web interface improved
+- ✅ Error handling strengthened
 
 ---
 
