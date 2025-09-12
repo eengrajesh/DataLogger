@@ -31,13 +31,21 @@ except ImportError as e:
     print(f"Data logger import warning: {e}")
     DATA_LOGGER_AVAILABLE = False
 
-# Simple Telegram bot - import only what we need
+# Import Telegram bot
 try:
     import requests
     TELEGRAM_AVAILABLE = True
 except ImportError:
     TELEGRAM_AVAILABLE = False
     print("Requests library not available - Telegram disabled")
+
+# Import the full Telegram bot
+try:
+    from telegram_bot import TelegramBot
+    TELEGRAM_BOT_AVAILABLE = True
+except ImportError:
+    TELEGRAM_BOT_AVAILABLE = False
+    print("Telegram bot module not available")
 
 app = Flask(__name__)
 db_manager = DatabaseManager()
@@ -514,21 +522,33 @@ if __name__ == '__main__':
         except Exception as e:
             print(f"- DAQ connection failed: {e}")
         
-        # Test Telegram bot
-        if app_state['telegram_token'] and TELEGRAM_AVAILABLE:
+        # Start Telegram bot
+        telegram_bot = None
+        if app_state['telegram_token'] and TELEGRAM_BOT_AVAILABLE:
             try:
-                # Test bot connectivity
+                import data_logger
+                telegram_bot = TelegramBot(data_logger_module=data_logger)
+                if telegram_bot.start():
+                    print("+ Telegram bot started successfully")
+                    send_telegram_message("**DataLogger Started** - System is online and ready for monitoring")
+                else:
+                    print("- Failed to start Telegram bot")
+            except Exception as e:
+                print(f"- Telegram bot startup failed: {e}")
+        elif app_state['telegram_token'] and TELEGRAM_AVAILABLE:
+            # Fallback to simple notification mode
+            try:
                 url = f"https://api.telegram.org/bot{app_state['telegram_token']}/getMe"
                 response = requests.get(url, timeout=5)
                 if response.status_code == 200:
                     bot_data = response.json()
                     bot_username = bot_data['result']['username']
-                    print(f"+ Telegram bot connected: @{bot_username}")
-                    send_telegram_message("**DataLogger Started** - System is online and ready for monitoring")
+                    print(f"+ Telegram notifications active: @{bot_username}")
+                    send_telegram_message("**DataLogger Started** - System is online (notifications only mode)")
                 else:
                     print("- Telegram bot token invalid")
             except Exception as e:
-                print(f"- Telegram bot test failed: {e}")
+                print(f"- Telegram test failed: {e}")
         else:
             print("- Telegram bot not configured")
         
@@ -552,6 +572,8 @@ if __name__ == '__main__':
         try:
             if app_state['telegram_token']:
                 send_telegram_message("**DataLogger Stopped** - System is shutting down")
+            if telegram_bot:
+                telegram_bot.stop()
             if DATA_LOGGER_AVAILABLE:
                 stop_logging_thread()
             notification_system.stop()
