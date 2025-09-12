@@ -173,6 +173,14 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             const result = await response.json();
             console.log(result.message);
+            
+            // Update board status immediately for connect/disconnect actions
+            if (url === '/api/connect' || url === '/api/disconnect') {
+                if (result.board_info) {
+                    updateConnectionStatus(result.board_info);
+                }
+            }
+            
             fetchData(); // Refresh data after action
         } catch (error) {
             console.error(`Error posting to ${url}:`, error);
@@ -182,7 +190,11 @@ document.addEventListener('DOMContentLoaded', function() {
     async function fetchData() {
         try {
             const [live, historical, average, boardInfo, sensorStatus, storageStatus, sensorIntervals, cpuTemp, calibrationFactors] = await Promise.all([
-                Promise.all([...Array(NUMBER_OF_CHANNELS).keys()].map(i => fetch(`/api/data/live/${i+1}`).then(res => res.ok ? res.json() : null))),
+                Promise.all([...Array(NUMBER_OF_CHANNELS).keys()].map(i => 
+                    fetch(`/api/data/live/${i+1}`)
+                        .then(res => res.ok ? res.json() : {error: "Not connected"})
+                        .catch(() => ({error: "Failed to fetch"}))
+                )),
                 fetch('/api/data/historical').then(res => res.json()),
                 fetch('/api/data/average').then(res => res.json()),
                 fetch('/api/board_info').then(res => res.json()),
@@ -206,6 +218,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    function updateConnectionStatus(boardInfo) {
+        // Update connection status indicator
+        const connectionStatus = boardInfo.connected || (boardInfo.board_info && boardInfo.board_info.connected);
+        
+        if (connectionStatus) {
+            LOGGING_STATUS_ELEMENT.classList.add('connected');
+            LOGGING_STATUS_ELEMENT.querySelector('.text').textContent = 'Connected';
+            CONNECT_BUTTON.disabled = true;
+            DISCONNECT_BUTTON.disabled = false;
+        } else {
+            LOGGING_STATUS_ELEMENT.classList.remove('connected');
+            LOGGING_STATUS_ELEMENT.querySelector('.text').textContent = 'Disconnected';
+            CONNECT_BUTTON.disabled = false;
+            DISCONNECT_BUTTON.disabled = true;
+        }
+    }
+    
     function updateHeaderStatus(storage, board, cpu) {
         const freeSpaceGB = (storage.free / (1024 * 1024 * 1024)).toFixed(2);
         STORAGE_STATUS_ELEMENT.textContent = `${freeSpaceGB} GB Free`;
@@ -216,14 +245,8 @@ document.addEventListener('DOMContentLoaded', function() {
             CPU_TEMP_STATUS_ELEMENT.textContent = '--.- °C';
         }
 
-        // This is a simple check. A more robust solution would be a dedicated logging status endpoint.
-        if (board.board_info.connected) {
-            LOGGING_STATUS_ELEMENT.classList.add('logging');
-            LOGGING_STATUS_ELEMENT.querySelector('.text').textContent = 'Logging';
-        } else {
-            LOGGING_STATUS_ELEMENT.classList.remove('logging');
-            LOGGING_STATUS_ELEMENT.querySelector('.text').textContent = 'Idle';
-        }
+        // Update connection status
+        updateConnectionStatus(board);
     }
 
     function updateSensorToggles(intervals) {
@@ -248,14 +271,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const avgReading = averageData.find(d => d.thermocouple_id === channel);
 
             if (activeSensors[channel]) {
-                if (boardInfo.board_info.connected && reading && reading.temperature !== undefined) {
+                // Check if board is connected and we have a valid reading
+                if (boardInfo.board_info.connected && reading && !reading.error && reading.temperature !== undefined) {
                     tile.querySelector('.temperature').textContent = `${reading.temperature.toFixed(1)} °C`;
                     indicator.classList.add('connected');
-                    // This was causing an error because the sensor-type select was removed.
-                    // A more robust solution would be to fetch the sensor type from the backend.
-                    /* if (document.getElementById(`sensor-type-${channel}`).value === 'K') {
-                        tile.classList.add('k-type');
-                    } */
                 } else {
                     tile.querySelector('.temperature').textContent = '--.- °C';
                     indicator.classList.remove('connected');

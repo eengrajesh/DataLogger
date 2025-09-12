@@ -239,6 +239,98 @@ class TelegramBot:
         except Exception as e:
             await update.message.reply_text(f"❌ Error getting status: {str(e)}")
     
+    async def _cmd_connect(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /connect command"""
+        if not self._is_authorized(update.effective_user.id):
+            return
+        
+        try:
+            if not self.data_logger_module:
+                await update.message.reply_text("❌ Data logger module not available")
+                return
+            
+            # Check if already connected
+            if self.data_logger_module.daq.connected:
+                await update.message.reply_text("⚠️ Already connected to DAQ board")
+                return
+            
+            # Try to connect
+            await update.message.reply_text("🔌 Connecting to DAQ board...")
+            success = self.data_logger_module.connect()
+            
+            if success:
+                board_info = self.data_logger_module.get_board_info()
+                message = (
+                    "✅ **Successfully Connected**\n\n"
+                    f"🔌 **Board:** {board_info.get('board_info', {}).get('hw_rev_major', 'Unknown')}.{board_info.get('board_info', {}).get('hw_rev_minor', 'Unknown')}\n"
+                    "You can now read temperatures and start logging."
+                )
+                
+                keyboard = [
+                    [InlineKeyboardButton("🌡️ Get Temperatures", callback_data="temps"),
+                     InlineKeyboardButton("▶️ Start Logging", callback_data="start_logging")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await update.message.reply_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+                
+                # Log the action
+                username = update.effective_user.username or "Unknown"
+                self.logger.info(f"DAQ connected via Telegram by @{username}")
+            else:
+                await update.message.reply_text(
+                    "❌ **Connection Failed**\n\n"
+                    "Could not connect to DAQ board.\n"
+                    "Please check:\n"
+                    "1. DAQ board is powered on\n"
+                    "2. I2C is enabled\n"
+                    "3. Board is properly connected",
+                    parse_mode='Markdown'
+                )
+                
+        except Exception as e:
+            await update.message.reply_text(f"❌ Connection error: {str(e)}")
+    
+    async def _cmd_disconnect(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /disconnect command"""
+        if not self._is_authorized(update.effective_user.id):
+            return
+        
+        try:
+            if not self.data_logger_module:
+                await update.message.reply_text("❌ Data logger module not available")
+                return
+            
+            # Check if connected
+            if not self.data_logger_module.daq.connected:
+                await update.message.reply_text("⚠️ Not connected to DAQ board")
+                return
+            
+            # Stop logging if active
+            if self.data_logger_module.is_logging():
+                self.data_logger_module.stop_logging_thread()
+                await update.message.reply_text("⏹️ Stopped logging before disconnecting")
+            
+            # Disconnect
+            self.data_logger_module.disconnect()
+            
+            message = (
+                "🔌 **Disconnected from DAQ**\n\n"
+                "Board has been safely disconnected."
+            )
+            
+            keyboard = [[InlineKeyboardButton("🔌 Connect Again", callback_data="connect")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await update.message.reply_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+            
+            # Log the action
+            username = update.effective_user.username or "Unknown"
+            self.logger.info(f"DAQ disconnected via Telegram by @{username}")
+            
+        except Exception as e:
+            await update.message.reply_text(f"❌ Disconnect error: {str(e)}")
+    
     async def _cmd_temperatures(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /temps command"""
         if not self._is_authorized(update.effective_user.id):
@@ -252,14 +344,24 @@ class TelegramBot:
             # Get current temperatures
             temp_message = "🌡️ **Current Temperatures**\n\n"
             
+            # Check if DAQ is connected first
+            if not self.data_logger_module.daq.connected:
+                temp_message += "⚠️ DAQ board not connected\n\n"
+                temp_message += "Use /connect to connect to the DAQ board first."
+                
+                keyboard = [[InlineKeyboardButton("🔌 Connect to DAQ", callback_data="connect")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await update.message.reply_text(temp_message, reply_markup=reply_markup, parse_mode='Markdown')
+                return
+            
             # Try to get live data
             try:
                 temps = {}
                 for channel in range(1, 9):  # Channels 1-8
                     try:
-                        temp = self.data_logger_module.daq.get(channel)
+                        temp = self.data_logger_module.daq.get_temp(channel)
                         if temp is not None:
-                            temps[channel] = temp / 10.0  # Convert to actual temperature
+                            temps[channel] = temp
                     except:
                         temps[channel] = None
                 
@@ -328,13 +430,23 @@ class TelegramBot:
             await update.message.reply_text("❌ Data logger module not available")
             return
         
+        # Check if DAQ is connected
+        if not self.data_logger_module.daq.connected:
+            await update.message.reply_text(
+                "❌ **Cannot Start Logging**\n\n"
+                "DAQ board is not connected.\n"
+                "Please connect first using /connect",
+                parse_mode='Markdown'
+            )
+            return
+        
         if self.data_logger_module.is_logging():
             await update.message.reply_text("⚠️ Logging is already active")
             return
         
         success = self.data_logger_module.start_logging_thread()
         if success:
-            await update.message.reply_text("✅ **Logging Started**\nTemperature data collection is now active.")
+            await update.message.reply_text("✅ **Logging Started**\nTemperature data collection is now active.", parse_mode='Markdown')
             
             # Log the action
             username = update.effective_user.username or "Unknown"
@@ -667,6 +779,10 @@ class TelegramBot:
             await self._cmd_status(fake_update, context)
         elif data == "temps":
             await self._cmd_temperatures(fake_update, context)
+        elif data == "connect":
+            await self._cmd_connect(fake_update, context)
+        elif data == "disconnect":
+            await self._cmd_disconnect(fake_update, context)
         elif data == "start_logging":
             await self._start_logging(fake_update)
         elif data == "stop_logging":

@@ -74,6 +74,7 @@ class MockSMtc:
         raise ValueError("Invalid input channel number.")
 
     def get_temp(self, channel):
+        # Only return temperature if connected
         if not self.connected:
             return None
         if 1 <= channel <= _IN_CH_COUNT:

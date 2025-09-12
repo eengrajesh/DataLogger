@@ -11,6 +11,10 @@ app = Flask(__name__)
 def api_live_data(channel):
     """API endpoint to get a live reading from a specific channel."""
     try:
+        # Check if board is connected before reading temperature
+        if not daq.connected:
+            return jsonify({"error": "Board not connected"}), 503
+        
         temp = daq.get_temp(channel)
         if temp is not None:
             return jsonify({"thermocouple_id": channel, "temperature": temp})
@@ -62,7 +66,8 @@ def api_stop_logging():
 def api_connect():
     """API endpoint to connect to the SMTC board."""
     if connect():
-        return jsonify({"status": "success", "message": "Successfully connected to SMTC."})
+        board_info = get_board_info()
+        return jsonify({"status": "success", "message": "Successfully connected to SMTC.", "board_info": board_info})
     else:
         return jsonify({"status": "error", "message": "Could not connect to SMTC."})
 
@@ -70,7 +75,8 @@ def api_connect():
 def api_disconnect():
     """API endpoint to disconnect from the SMTC board."""
     disconnect()
-    return jsonify({"status": "success", "message": "Successfully disconnected from SMTC."})
+    board_info = get_board_info()
+    return jsonify({"status": "success", "message": "Successfully disconnected from SMTC.", "board_info": board_info})
 
 @app.route('/api/board_info')
 def api_board_info():
