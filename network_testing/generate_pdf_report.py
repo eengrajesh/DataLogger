@@ -1,0 +1,537 @@
+#!/usr/bin/env python3
+"""
+Generate PDF version of the Network Testing Checklist
+Creates a printable PDF document from the markdown checklist
+"""
+
+import os
+import sys
+
+def generate_html_report():
+    """Convert markdown checklist to HTML with print-friendly CSS"""
+    
+    html_content = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DataLogger Network Testing Checklist</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1.5cm;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            page-break-after: avoid;
+        }
+        
+        h2 {
+            color: #34495e;
+            background: #ecf0f1;
+            padding: 8px 12px;
+            border-left: 4px solid #3498db;
+            page-break-after: avoid;
+            margin-top: 20px;
+        }
+        
+        h3 {
+            color: #34495e;
+            margin-top: 15px;
+            page-break-after: avoid;
+        }
+        
+        .checkbox {
+            width: 14px;
+            height: 14px;
+            border: 2px solid #333;
+            display: inline-block;
+            margin-right: 8px;
+            vertical-align: middle;
+            background: white;
+        }
+        
+        .checklist-item {
+            margin: 8px 0;
+            page-break-inside: avoid;
+        }
+        
+        .input-field {
+            display: inline-block;
+            border-bottom: 1px solid #333;
+            min-width: 150px;
+            margin: 0 5px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            page-break-inside: avoid;
+        }
+        
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        
+        .method-section {
+            page-break-before: auto;
+            page-break-after: auto;
+            margin: 30px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .score-box {
+            display: inline-block;
+            border: 2px solid #333;
+            padding: 5px 10px;
+            margin: 10px 5px;
+            font-weight: bold;
+        }
+        
+        .header-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .command-box {
+            background: #2c3d50;
+            color: #ecf0f1;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        
+        .success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        
+        @media print {
+            .no-print {
+                display: none;
+            }
+            
+            h1, h2 {
+                page-break-after: avoid;
+            }
+            
+            .method-section {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>📋 DataLogger Network Connectivity Testing Checklist</h1>
+    
+    <div class="header-info">
+        <p><strong>Project:</strong> Raspberry Pi DataLogger Network Access Testing</p>
+        <p><strong>Date:</strong> <span class="input-field" style="width: 200px;">&nbsp;</span></p>
+        <p><strong>Tester:</strong> <span class="input-field" style="width: 200px;">&nbsp;</span></p>
+        <p><strong>Pi5 Location:</strong> <span class="input-field" style="width: 200px;">&nbsp;</span></p>
+        <p><strong>Network Type:</strong> 
+            <span class="checkbox"></span>Home 
+            <span class="checkbox"></span>Office 
+            <span class="checkbox"></span>Industrial 
+            <span class="checkbox"></span>Secured/Restricted
+        </p>
+    </div>
+
+    <h2>🔧 PRE-TEST SETUP CHECKLIST</h2>
+    
+    <h3>Hardware Requirements:</h3>
+    <div class="checklist-item"><span class="checkbox"></span> Raspberry Pi 5 powered on</div>
+    <div class="checklist-item"><span class="checkbox"></span> Sequent Microsystems 8-Thermocouple DAQ HAT connected</div>
+    <div class="checklist-item"><span class="checkbox"></span> Ethernet cable or WiFi configured</div>
+    <div class="checklist-item"><span class="checkbox"></span> MicroSD card with OS installed</div>
+    <div class="checklist-item"><span class="checkbox"></span> Power supply connected (5V/3A recommended)</div>
+    
+    <h3>Software Requirements on Pi5:</h3>
+    <div class="checklist-item"><span class="checkbox"></span> DataLogger application installed (/home/pi/DataLogger)</div>
+    <div class="checklist-item"><span class="checkbox"></span> Python 3.9+ installed</div>
+    <div class="checklist-item"><span class="checkbox"></span> Flask server configured (port 8080)</div>
+    <div class="checklist-item"><span class="checkbox"></span> SQLite database initialized</div>
+    <div class="checklist-item"><span class="checkbox"></span> Service running: sudo systemctl status datalogger</div>
+    
+    <h3>Network Configuration:</h3>
+    <div class="checklist-item"><span class="checkbox"></span> Pi5 IP address noted: <span class="input-field">___.___.___.___ </span></div>
+    <div class="checklist-item"><span class="checkbox"></span> Router access available: <span class="checkbox"></span>Yes <span class="checkbox"></span>No</div>
+    <div class="checklist-item"><span class="checkbox"></span> Firewall rules checked: <span class="checkbox"></span>Yes <span class="checkbox"></span>No</div>
+    <div class="checklist-item"><span class="checkbox"></span> Internet connection tested: <span class="checkbox"></span>Yes <span class="checkbox"></span>No</div>
+
+    <div class="method-section">
+        <h2>📝 METHOD 1: LOCAL NETWORK ACCESS (LAN)</h2>
+        
+        <h3>Configuration:</h3>
+        <p>Pi5 Local IP: <span class="input-field">___.___.___.___</span></p>
+        <p>Router Model: <span class="input-field" style="width: 200px;">&nbsp;</span></p>
+        <p>Network Name: <span class="input-field" style="width: 200px;">&nbsp;</span></p>
+        
+        <h3>Tests:</h3>
+        <div class="checklist-item">
+            <span class="checkbox"></span> <strong>Ping Test</strong>
+            <div class="command-box">ping [Pi5_IP] -c 4</div>
+            Success: <span class="checkbox"></span>Yes <span class="checkbox"></span>No | 
+            Avg Latency: <span class="input-field" style="width: 80px;">_____ms</span>
+        </div>
+        
+        <div class="checklist-item">
+            <span class="checkbox"></span> <strong>SSH Access</strong>
+            <div class="command-box">ssh pi@[Pi5_IP]</div>
+            Port 22 Open: <span class="checkbox"></span>Yes <span class="checkbox"></span>No | 
+            Login Success: <span class="checkbox"></span>Yes <span class="checkbox"></span>No
+        </div>
+        
+        <div class="checklist-item">
+            <span class="checkbox"></span> <strong>Web Interface</strong>
+            <div class="command-box">http://[Pi5_IP]:8080</div>
+            Page Loads: <span class="checkbox"></span>Yes <span class="checkbox"></span>No | 
+            Response Time: <span class="input-field" style="width: 80px;">_____ms</span>
+        </div>
+        
+        <div class="score-box">Score: ___/10</div>
+        <div class="score-box">Works Outside LAN: <span class="checkbox"></span>Yes <span class="checkbox"></span>No</div>
+    </div>
+
+    <div class="method-section">
+        <h2>📝 METHOD 2: TAILSCALE VPN</h2>
+        
+        <h3>Installation on Pi5:</h3>
+        <div class="command-box">curl -fsSL https://tailscale.com/install.sh | sh<br>sudo tailscale up</div>
+        
+        <div class="checklist-item"><span class="checkbox"></span> Installation completed</div>
+        <div class="checklist-item"><span class="checkbox"></span> Auth URL visited</div>
+        <div class="checklist-item">Device name: <span class="input-field" style="width: 200px;">&nbsp;</span></div>
+        <div class="checklist-item">Tailscale IP: 100.<span class="input-field" style="width: 150px;">___.___.___ </span></div>
+        
+        <h3>Connection Tests:</h3>
+        <div class="checklist-item">
+            <span class="checkbox"></span> Ping via Tailscale successful
+        </div>
+        <div class="checklist-item">
+            <span class="checkbox"></span> Web interface accessible
+        </div>
+        <div class="checklist-item">
+            <span class="checkbox"></span> SSH via Tailscale works
+        </div>
+        
+        <h3>Features:</h3>
+        <div class="checklist-item"><span class="checkbox"></span> Works behind NAT</div>
+        <div class="checklist-item"><span class="checkbox"></span> Works on cellular</div>
+        <div class="checklist-item"><span class="checkbox"></span> Works on public WiFi</div>
+        <div class="checklist-item"><span class="checkbox"></span> Auto-reconnects</div>
+        
+        <div class="score-box">Score: ___/10</div>
+        <div class="score-box">Firewall Friendly: <span class="checkbox"></span>Yes <span class="checkbox"></span>No</div>
+    </div>
+
+    <div class="method-section">
+        <h2>📝 METHOD 3: CLOUDFLARE TUNNEL</h2>
+        
+        <h3>Setup Commands:</h3>
+        <div class="command-box">
+wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64<br>
+chmod +x cloudflared-linux-arm64<br>
+./cloudflared-linux-arm64 tunnel --url http://localhost:8080
+        </div>
+        
+        <div class="checklist-item">
+            Public URL received: https://<span class="input-field" style="width: 200px;">&nbsp;</span>.trycloudflare.com
+        </div>
+        
+        <h3>Access Tests:</h3>
+        <div class="checklist-item"><span class="checkbox"></span> From local network works</div>
+        <div class="checklist-item"><span class="checkbox"></span> From cellular/4G works</div>
+        <div class="checklist-item"><span class="checkbox"></span> From different WiFi works</div>
+        <div class="checklist-item">Response time: <span class="input-field" style="width: 80px;">_____ms</span></div>
+        
+        <div class="score-box">Score: ___/10</div>
+        <div class="score-box">Public Accessible: <span class="checkbox"></span>Yes <span class="checkbox"></span>No</div>
+    </div>
+
+    <div class="method-section">
+        <h2>📝 METHOD 4: MQTT BROKER</h2>
+        
+        <h3>Broker Selection:</h3>
+        <div class="checklist-item"><span class="checkbox"></span> test.mosquitto.org (1883/8883)</div>
+        <div class="checklist-item"><span class="checkbox"></span> broker.hivemq.com (1883)</div>
+        <div class="checklist-item"><span class="checkbox"></span> broker.emqx.io (1883/8883)</div>
+        <div class="checklist-item">Selected: <span class="input-field" style="width: 200px;">&nbsp;</span></div>
+        
+        <h3>Connection Tests:</h3>
+        <div class="checklist-item"><span class="checkbox"></span> Connect to broker successful</div>
+        <div class="checklist-item"><span class="checkbox"></span> Publish message successful</div>
+        <div class="checklist-item"><span class="checkbox"></span> Subscribe and receive works</div>
+        <div class="checklist-item">Latency: <span class="input-field" style="width: 80px;">_____ms</span></div>
+        
+        <div class="score-box">Score: ___/10</div>
+        <div class="score-box">Real-time Data: <span class="checkbox"></span>Yes <span class="checkbox"></span>No</div>
+    </div>
+
+    <div class="method-section">
+        <h2>📝 METHOD 5: TELEGRAM BOT</h2>
+        
+        <h3>Bot Creation:</h3>
+        <div class="checklist-item"><span class="checkbox"></span> BotFather contacted</div>
+        <div class="checklist-item">Bot username: @<span class="input-field" style="width: 200px;">&nbsp;</span></div>
+        <div class="checklist-item"><span class="checkbox"></span> Bot token received</div>
+        
+        <h3>Commands Implemented:</h3>
+        <div class="checklist-item"><span class="checkbox"></span> /status - System status</div>
+        <div class="checklist-item"><span class="checkbox"></span> /temp [channel] - Get temperature</div>
+        <div class="checklist-item"><span class="checkbox"></span> /start_logging - Start logging</div>
+        <div class="checklist-item"><span class="checkbox"></span> /stop_logging - Stop logging</div>
+        
+        <div class="score-box">Score: ___/10</div>
+        <div class="score-box">Notification Ready: <span class="checkbox"></span>Yes <span class="checkbox"></span>No</div>
+    </div>
+
+    <div class="method-section">
+        <h2>📊 FINAL COMPARISON MATRIX</h2>
+        
+        <table>
+            <tr>
+                <th>Method</th>
+                <th>Setup Easy</th>
+                <th>Firewall OK</th>
+                <th>Remote Access</th>
+                <th>Real-time</th>
+                <th>Score</th>
+            </tr>
+            <tr>
+                <td>Local Network</td>
+                <td>⭐⭐⭐⭐⭐</td>
+                <td>❌</td>
+                <td>❌</td>
+                <td>✅</td>
+                <td>___/10</td>
+            </tr>
+            <tr>
+                <td>Tailscale</td>
+                <td>⭐⭐⭐⭐</td>
+                <td>✅</td>
+                <td>✅</td>
+                <td>✅</td>
+                <td>___/10</td>
+            </tr>
+            <tr>
+                <td>Cloudflare</td>
+                <td>⭐⭐⭐⭐</td>
+                <td>✅</td>
+                <td>✅</td>
+                <td>✅</td>
+                <td>___/10</td>
+            </tr>
+            <tr>
+                <td>MQTT</td>
+                <td>⭐⭐⭐</td>
+                <td>✅</td>
+                <td>✅</td>
+                <td>✅</td>
+                <td>___/10</td>
+            </tr>
+            <tr>
+                <td>Telegram</td>
+                <td>⭐⭐⭐</td>
+                <td>✅</td>
+                <td>✅</td>
+                <td>⚠️</td>
+                <td>___/10</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="method-section">
+        <h2>🎯 RECOMMENDED SOLUTION</h2>
+        
+        <p><strong>Primary Method:</strong> <span class="input-field" style="width: 250px;">&nbsp;</span> (Score: ___/10)</p>
+        <p><strong>Backup Method:</strong> <span class="input-field" style="width: 250px;">&nbsp;</span> (Score: ___/10)</p>
+        <p><strong>Alert System:</strong> <span class="input-field" style="width: 250px;">&nbsp;</span></p>
+        
+        <h3>Justification:</h3>
+        <div style="border: 1px solid #ddd; min-height: 100px; padding: 10px; margin: 10px 0;">
+            &nbsp;
+        </div>
+    </div>
+
+    <div class="method-section">
+        <h2>✅ SIGN-OFF</h2>
+        
+        <p><strong>Testing Completed By:</strong> <span class="input-field" style="width: 250px;">&nbsp;</span></p>
+        <p><strong>Date:</strong> <span class="input-field" style="width: 150px;">&nbsp;</span></p>
+        <p><strong>Time Taken:</strong> <span class="input-field" style="width: 100px;">&nbsp;</span> hours</p>
+        <p><strong>Approved By:</strong> <span class="input-field" style="width: 250px;">&nbsp;</span></p>
+    </div>
+
+</body>
+</html>"""
+    
+    # Save HTML file
+    with open('network_testing_checklist.html', 'w', encoding='utf-8') as f:
+        f.write(html_content)
+    
+    print("[OK] HTML report generated: network_testing_checklist.html")
+    return 'network_testing_checklist.html'
+
+def html_to_pdf_with_browser():
+    """Convert HTML to PDF using browser print function"""
+    import webbrowser
+    import os
+    
+    html_file = generate_html_report()
+    
+    # Get absolute path
+    abs_path = os.path.abspath(html_file)
+    
+    # Open in browser
+    webbrowser.open(f'file:///{abs_path}')
+    
+    print("\n📄 PDF Generation Instructions:")
+    print("1. The checklist has opened in your browser")
+    print("2. Press Ctrl+P (or Cmd+P on Mac)")
+    print("3. Select 'Save as PDF' as the printer")
+    print("4. Click 'Save' and choose location")
+    print("\n[SUCCESS] Your printable PDF checklist is ready!")
+
+def try_install_packages():
+    """Try to install required packages for PDF generation"""
+    print("\nAttempting to install PDF generation packages...")
+    
+    packages = [
+        ('reportlab', 'reportlab'),
+        ('weasyprint', 'weasyprint'),
+        ('pdfkit', 'pdfkit')
+    ]
+    
+    for package_name, import_name in packages:
+        try:
+            __import__(import_name)
+            print(f"[OK] {package_name} is already installed")
+            return import_name
+        except ImportError:
+            try:
+                import subprocess
+                print(f"Installing {package_name}...")
+                subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
+                print(f"[OK] {package_name} installed successfully")
+                return import_name
+            except:
+                print(f"[FAILED] Could not install {package_name}")
+    
+    return None
+
+def generate_pdf_with_reportlab():
+    """Generate PDF using reportlab (if available)"""
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter, A4
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        
+        # Create PDF
+        pdf_file = "network_testing_checklist.pdf"
+        doc = SimpleDocTemplate(pdf_file, pagesize=A4)
+        
+        # Container for the 'Flowable' objects
+        elements = []
+        
+        # Define styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor=colors.HexColor('#2c3e50'),
+            spaceAfter=30,
+        )
+        
+        # Add title
+        elements.append(Paragraph("DataLogger Network Testing Checklist", title_style))
+        elements.append(Spacer(1, 12))
+        
+        # Add content
+        elements.append(Paragraph("This is a comprehensive network testing checklist for DataLogger", styles['Normal']))
+        
+        # Build PDF
+        doc.build(elements)
+        
+        print(f"[OK] PDF generated successfully: {pdf_file}")
+        return pdf_file
+        
+    except ImportError:
+        return None
+
+def main():
+    print("""
+    ============================================================
+         DataLogger Network Testing Checklist               
+         PDF Report Generator                               
+    ============================================================
+    """)
+    
+    print("\nGenerating printable checklist...")
+    
+    # Method 1: Try using browser print
+    try:
+        html_to_pdf_with_browser()
+        return
+    except Exception as e:
+        print(f"Browser method failed: {e}")
+    
+    # Method 2: Try using Python PDF libraries
+    pdf_lib = try_install_packages()
+    if pdf_lib == 'reportlab':
+        pdf_file = generate_pdf_with_reportlab()
+        if pdf_file:
+            print(f"\n[SUCCESS] PDF checklist generated: {pdf_file}")
+            return
+    
+    # Fallback: Just create HTML
+    html_file = generate_html_report()
+    print(f"\n[SUCCESS] HTML checklist generated: {html_file}")
+    print("\nTo create PDF:")
+    print("1. Open the HTML file in your browser")
+    print("2. Press Ctrl+P to print")
+    print("3. Select 'Save as PDF'")
+
+if __name__ == "__main__":
+    main()
