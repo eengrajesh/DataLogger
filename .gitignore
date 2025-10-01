@@ -1,10 +1,13 @@
 # Virtual Environment
 .venv/
 venv/
+env/
 
 # Python cache
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
 # SQLite database
 *.db
@@ -13,6 +16,37 @@ __pycache__/
 *.db-shm
 *.sqlite3
 
+# Logs
+*.log
+logs/
+
+# Data files
+data-logger-project/data/raw/*.txt
+data-logger-project/data/daily/*.txt
+data-logger-project/data/compressed/*.gz
+
+# Temporary and simulated folders
+simulated_*/
+temp/
+tmp/
+
+# Configuration files with secrets (keep templates)
+config_local.json
+.env
+
 # OS generated files
 .DS_Store
 Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# Backups
+*.bak
+*.backup
+*.zip.old

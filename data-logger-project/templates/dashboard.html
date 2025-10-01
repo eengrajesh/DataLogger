@@ -1226,7 +1226,9 @@
             try {
                 const response = await fetch('/api/connect', { method: 'POST' });
                 const data = await response.json();
-                updateBoardStatus(data.connected);
+                if (data.status === 'success' && data.board_info) {
+                    updateBoardStatus(data.board_info.connected);
+                }
             } catch (error) {
                 console.error('Error connecting to board:', error);
             }
@@ -1236,7 +1238,9 @@
             try {
                 const response = await fetch('/api/disconnect', { method: 'POST' });
                 const data = await response.json();
-                updateBoardStatus(!data.disconnected);
+                if (data.status === 'success' && data.board_info) {
+                    updateBoardStatus(data.board_info.connected);
+                }
             } catch (error) {
                 console.error('Error disconnecting board:', error);
             }
@@ -1246,7 +1250,7 @@
             try {
                 const response = await fetch('/api/logging/start', { method: 'POST' });
                 const data = await response.json();
-                updateLoggingStatus(data.status === 'started');
+                updateLoggingStatus(data.status === 'success');
             } catch (error) {
                 console.error('Error starting logging:', error);
             }
@@ -1268,7 +1272,7 @@
                 const response = await fetch(`/api/sensor_status/${channel}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ active: isActive })
+                    body: JSON.stringify({ status: isActive })
                 });
                 updateActiveChannelCount();
             } catch (error) {

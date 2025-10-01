@@ -158,7 +158,7 @@ def is_logging():
 
 def is_connected():
     """Check if DAQ hardware is connected"""
-    return daq is not None
+    return daq is not None and daq.connected
 
 if __name__ == '__main__':
     print("Starting data logger as a standalone script...")

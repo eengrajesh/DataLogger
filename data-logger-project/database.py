@@ -73,6 +73,7 @@ def clear_all_data():
     cursor.execute("DELETE FROM readings")
     conn.commit()
     conn.close()
+
 def get_all_data():
     """Fetches all data from the readings table."""
     conn = get_db_connection()
@@ -80,6 +81,8 @@ def get_all_data():
     cursor.execute("SELECT * FROM readings ORDER BY timestamp")
     readings = cursor.fetchall()
     conn.close()
+    return [dict(row) for row in readings]
+
 def get_average_temperatures():
     """Calculates the average temperature for each thermocouple."""
     conn = get_db_connection()
@@ -93,7 +96,6 @@ def get_average_temperatures():
     avg_temps = cursor.fetchall()
     conn.close()
     return [dict(row) for row in avg_temps]
-    return [dict(row) for row in readings]
 
 if __name__ == '__main__':
     # This allows us to initialize the database from the command line

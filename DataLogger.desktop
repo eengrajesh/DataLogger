@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=DataLogger
+Comment=Temperature Data Logger Application
+Exec=/home/pi/DataLogger/data-logger-project/start_datalogger.sh
+Icon=/home/pi/DataLogger/data-logger-project/logo.png
+Terminal=false
+Categories=Application;Science;
+StartupNotify=true

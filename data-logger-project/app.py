@@ -1,9 +1,13 @@
-from flask import Flask, render_template, jsonify, send_from_directory
+from flask import Flask, render_template, jsonify, send_from_directory, Response, request
 from database import get_latest_readings, get_historical_data, get_average_temperatures, clear_all_data, get_all_data
 from data_logger import start_logging_thread, stop_logging_thread, daq, get_board_info, connect, disconnect, get_storage_status, set_sensor_status, get_sensor_status, set_sensor_interval, get_sensor_intervals, get_cpu_temperature
 from calibration import get_calibration_factors, set_calibration_factor
+from datetime import datetime
 import os
 import signal
+import json
+import io
+import csv
 
 app = Flask(__name__)
 
@@ -121,11 +125,6 @@ def api_clear_data():
 def api_download_data(file_format):
     """API endpoint to download all data in a specified format."""
     try:
-        from flask import Response
-        import json
-        import io
-        import csv
-
         readings = get_all_data()
 
         if not readings:
@@ -179,7 +178,6 @@ def api_average_data():
 def api_set_sensor_type(channel):
     """API endpoint to set the sensor type for a specific channel."""
     try:
-        from flask import request
         sensor_type = request.json.get('sensor_type')
         daq.set_sensor_type(channel, sensor_type)
         return jsonify({"status": "success", "message": f"Sensor type for channel {channel} set to {sensor_type}."})
@@ -190,7 +188,6 @@ def api_set_sensor_type(channel):
 def api_set_sensor_status(channel):
     """API endpoint to set the active status of a sensor."""
     try:
-        from flask import request
         status = request.json.get('status')
         if set_sensor_status(channel, status):
             return jsonify({"status": "success", "message": f"Sensor status for channel {channel} set to {status}."})
@@ -211,7 +208,6 @@ def api_get_sensor_status():
 def api_set_sensor_interval(channel):
     """API endpoint to set the sampling interval for a sensor."""
     try:
-        from flask import request
         interval = request.json.get('interval')
         if set_sensor_interval(channel, interval):
             return jsonify({"status": "success", "message": f"Interval for channel {channel} set to {interval}s."})
@@ -259,7 +255,6 @@ def api_get_calibration():
 def api_set_calibration(channel):
     """API endpoint to set a calibration factor for a specific channel."""
     try:
-        from flask import request
         factor = request.json.get('factor')
         set_calibration_factor(channel, factor)
         return jsonify({"status": "success", "message": f"Calibration factor for channel {channel} set to {factor}."})
@@ -270,8 +265,7 @@ def api_set_calibration(channel):
 def api_system_status():
     """API endpoint for system status - required by dashboard.html"""
     try:
-        from datetime import datetime
-        
+
         # Get system status
         logging_active = False
         daq_connected = daq.connected if daq else False
