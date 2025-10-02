@@ -55,6 +55,7 @@ def connect():
 
 def disconnect():
     daq.disconnect()
+    return True  # Return success
 
 def set_sensor_status(channel, status):
     if channel in sensor_active_status:
