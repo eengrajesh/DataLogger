@@ -1675,7 +1675,13 @@
 
             for (let channel = 1; channel <= 8; channel++) {
                 const data = channelData[channel];
-                if (data && data.length > 0) {
+
+                // Check if sensor checkbox is enabled
+                const sensorCheckbox = document.getElementById(`sensor-${channel}`);
+                const isSensorEnabled = sensorCheckbox ? sensorCheckbox.checked : true;
+
+                // Only show stats if channel has data AND sensor is enabled
+                if (data && data.length > 0 && isSensorEnabled) {
                     hasAnyData = true;
                     const avg = (data.reduce((a, b) => a + b, 0) / data.length).toFixed(2);
                     const min = Math.min(...data).toFixed(2);
@@ -1763,7 +1769,13 @@
             let hasData = false;
             Object.keys(channelGroups).forEach(channel => {
                 const chData = channelGroups[channel];
-                if (chData.x && chData.x.length > 0) {
+
+                // Check if sensor checkbox is enabled
+                const sensorCheckbox = document.getElementById(`sensor-${channel}`);
+                const isSensorEnabled = sensorCheckbox ? sensorCheckbox.checked : true;
+
+                // Only show data if channel has data AND sensor is enabled
+                if (chData.x && chData.x.length > 0 && isSensorEnabled) {
                     hasData = true;
                     traces.push({
                         x: chData.x,
