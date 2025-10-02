@@ -1665,20 +1665,23 @@
         function updateChannelStats() {
             const statsContainer = document.getElementById('channel-stats');
             statsContainer.innerHTML = '';
-            
+
             const colors = [
-                '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', 
+                '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A',
                 '#98D8C8', '#FFD93D', '#6C5CE7', '#A8E6CF'
             ];
-            
+
+            let hasAnyData = false;
+
             for (let channel = 1; channel <= 8; channel++) {
                 const data = channelData[channel];
-                if (data.length > 0) {
+                if (data && data.length > 0) {
+                    hasAnyData = true;
                     const avg = (data.reduce((a, b) => a + b, 0) / data.length).toFixed(2);
                     const min = Math.min(...data).toFixed(2);
                     const max = Math.max(...data).toFixed(2);
                     const latest = data[data.length - 1].toFixed(2);
-                    
+
                     const statDiv = document.createElement('div');
                     statDiv.style.cssText = `
                         background: white;
@@ -1699,6 +1702,11 @@
                     `;
                     statsContainer.appendChild(statDiv);
                 }
+            }
+
+            // Show placeholder if no data available
+            if (!hasAnyData) {
+                showPlaceholderStats();
             }
         }
 
@@ -2018,14 +2026,15 @@
         document.addEventListener('DOMContentLoaded', function() {
             initializeSensorControls();
             initializeGraph();
+            showPlaceholderStats();  // Show placeholder until data arrives
             loadLogo();  // Load logo
-            
+
             // Set default date range for export
             const now = new Date();
             const yesterday = new Date(now - 24 * 60 * 60 * 1000);
             document.getElementById('export-end').value = now.toISOString().slice(0, 16);
             document.getElementById('export-start').value = yesterday.toISOString().slice(0, 16);
-            
+
             // Start periodic updates
             setInterval(updateLiveData, 5000);
             setInterval(updateCpuTemperature, 3000);  // Update CPU temp every 3 seconds

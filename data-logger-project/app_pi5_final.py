@@ -114,10 +114,10 @@ def api_connect():
             app_state['daq_connected'] = result
             if result:
                 send_telegram_message("DAQ Connected - Hardware connection established")
-                board_info = get_board_info()
+                info = get_board_info()  # Returns {"board_info": {...}}
                 return jsonify({
                     "status": "success",
-                    "board_info": board_info
+                    "board_info": info["board_info"]  # Unwrap the nested board_info
                 })
             else:
                 return jsonify({"status": "failed", "message": "Connection failed"})
