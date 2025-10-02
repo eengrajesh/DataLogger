@@ -470,11 +470,27 @@ def api_gpio_status():
 
 @app.route('/api/cpu_temperature')
 def api_cpu_temperature_alt():
-    """Alternate CPU temperature endpoint for dashboard compatibility"""
+    """CPU temperature endpoint for dashboard compatibility"""
     try:
-        return jsonify(get_cpu_temperature())
-    except:
-        return jsonify({"cpu_temp": 0, "error": "Not available"})
+        result = get_cpu_temperature()
+        cpu_temp = result.get("cpu_temp", 0)
+
+        # Determine status based on temperature
+        if cpu_temp < 0:
+            status = "unavailable"
+        elif cpu_temp >= 80:
+            status = "critical"
+        elif cpu_temp >= 70:
+            status = "warning"
+        else:
+            status = "normal"
+
+        return jsonify({
+            "temperature": cpu_temp,
+            "status": status
+        })
+    except Exception as e:
+        return jsonify({"temperature": 0, "status": "error", "error": str(e)})
 
 @app.route('/api/textfiles/stats')
 def api_textfiles_stats():
