@@ -1146,31 +1146,8 @@
             }
         }
 
-        // Initialize Plotly graph with improved styling
+        // Initialize Plotly graph - starts empty until data is available
         function initializeGraph() {
-            const colors = [
-                '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', 
-                '#98D8C8', '#FFD93D', '#6C5CE7', '#A8E6CF'
-            ];
-            
-            const data = [];
-            for (let i = 1; i <= 8; i++) {
-                data.push({
-                    x: [],
-                    y: [],
-                    type: 'scatter',
-                    mode: 'lines',  // Continuous lines, not dots
-                    name: `CH${i}`,
-                    line: {
-                        color: colors[i-1],
-                        width: 2,
-                        shape: 'spline'  // Smooth curves
-                    },
-                    connectgaps: true,  // Connect gaps in data
-                    hovertemplate: 'CH' + i + '<br>Time: %{x}<br>Temp: %{y:.2f}°C<extra></extra>'
-                });
-            }
-
             const layout = {
                 title: {
                     text: 'Temperature Trends',
@@ -1186,41 +1163,30 @@
                     title: 'Temperature (°C)',
                     gridcolor: '#E5E7EB',
                     showgrid: true,
-                    range: [0, 100],  // Set reasonable temperature range
-                    autorange: false  // Prevent auto-scaling to weird values
+                    range: [0, 100]
                 },
                 margin: { t: 50, r: 150, b: 50, l: 60 },
-                showlegend: true,
-                legend: {
-                    orientation: 'v',
-                    x: 1.02,  // Position legend on the right side
-                    y: 1,
-                    xanchor: 'left',
-                    bgcolor: 'rgba(255, 255, 255, 0.9)',
-                    bordercolor: '#E5E7EB',
-                    borderwidth: 1,
-                    font: { size: 11 }
-                },
-                hovermode: 'x unified',  // Show all values at cursor position
+                annotations: [{
+                    text: 'No data available<br>Connect board and start logging',
+                    xref: 'paper',
+                    yref: 'paper',
+                    x: 0.5,
+                    y: 0.5,
+                    xanchor: 'center',
+                    yanchor: 'middle',
+                    showarrow: false,
+                    font: { size: 16, color: '#9CA3AF' }
+                }],
                 plot_bgcolor: '#FAFAFA',
                 paper_bgcolor: '#FFFFFF'
             };
 
             const config = {
                 responsive: true,
-                displayModeBar: true,
-                displaylogo: false,
-                modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'],
-                toImageButtonOptions: {
-                    format: 'png',
-                    filename: 'temperature_data',
-                    height: 500,
-                    width: 1200,
-                    scale: 1
-                }
+                displayModeBar: false  // Hide toolbar until data is available
             };
 
-            Plotly.newPlot('temperature-graph', data, layout, config);
+            Plotly.newPlot('temperature-graph', [], layout, config);
         }
 
         // API Functions
@@ -1781,32 +1747,38 @@
         function updateGraph(channelGroups) {
             const traces = [];
             const colors = [
-                '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', 
+                '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A',
                 '#98D8C8', '#FFD93D', '#6C5CE7', '#A8E6CF'
             ];
-            
+
+            // Check if we have any actual data
+            let hasData = false;
             Object.keys(channelGroups).forEach(channel => {
                 const chData = channelGroups[channel];
-                traces.push({
-                    x: chData.x,
-                    y: chData.y,
-                    type: 'scatter',
-                    mode: 'lines',
-                    name: `CH${channel}`,
-                    line: {
-                        color: colors[parseInt(channel) - 1],
-                        width: 2,
-                        shape: 'spline'
-                    },
-                    connectgaps: true
-                });
+                if (chData.x && chData.x.length > 0) {
+                    hasData = true;
+                    traces.push({
+                        x: chData.x,
+                        y: chData.y,
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: `CH${channel}`,
+                        line: {
+                            color: colors[parseInt(channel) - 1],
+                            width: 2,
+                            shape: 'spline'
+                        },
+                        connectgaps: true
+                    });
+                }
             });
-            
-            if (traces.length > 0) {
+
+            if (hasData) {
+                // Chart with data - auto-scale y-axis based on actual readings
                 Plotly.newPlot('temperature-graph', traces, {
                     title: { text: 'Temperature Trends', font: { size: 16 } },
                     xaxis: { title: 'Time', type: 'date', gridcolor: '#E5E7EB', showgrid: true },
-                    yaxis: { title: 'Temperature (°C)', gridcolor: '#E5E7EB', showgrid: true, range: [0, 100], autorange: false },
+                    yaxis: { title: 'Temperature (°C)', gridcolor: '#E5E7EB', showgrid: true, autorange: true },
                     margin: { t: 50, r: 150, b: 50, l: 60 },
                     showlegend: true,
                     legend: {
@@ -1820,6 +1792,29 @@
                 }, {
                     responsive: true, displayModeBar: true, displaylogo: false,
                     modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+                });
+            } else {
+                // No data - show empty chart with message
+                Plotly.newPlot('temperature-graph', [], {
+                    title: { text: 'Temperature Trends', font: { size: 16 } },
+                    xaxis: { title: 'Time', type: 'date', gridcolor: '#E5E7EB', showgrid: true },
+                    yaxis: { title: 'Temperature (°C)', gridcolor: '#E5E7EB', showgrid: true, range: [0, 100] },
+                    margin: { t: 50, r: 150, b: 50, l: 60 },
+                    annotations: [{
+                        text: 'No data available<br>Connect board and start logging',
+                        xref: 'paper',
+                        yref: 'paper',
+                        x: 0.5,
+                        y: 0.5,
+                        xanchor: 'center',
+                        yanchor: 'middle',
+                        showarrow: false,
+                        font: { size: 16, color: '#9CA3AF' }
+                    }],
+                    plot_bgcolor: '#FAFAFA',
+                    paper_bgcolor: '#FFFFFF'
+                }, {
+                    responsive: true, displayModeBar: false
                 });
             }
         }
