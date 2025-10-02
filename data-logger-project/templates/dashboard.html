@@ -1185,7 +1185,9 @@
                 yaxis: {
                     title: 'Temperature (°C)',
                     gridcolor: '#E5E7EB',
-                    showgrid: true
+                    showgrid: true,
+                    range: [0, 100],  // Set reasonable temperature range
+                    autorange: false  // Prevent auto-scaling to weird values
                 },
                 margin: { t: 50, r: 150, b: 50, l: 60 },
                 showlegend: true,
@@ -1804,7 +1806,7 @@
                 Plotly.newPlot('temperature-graph', traces, {
                     title: { text: 'Temperature Trends', font: { size: 16 } },
                     xaxis: { title: 'Time', type: 'date', gridcolor: '#E5E7EB', showgrid: true },
-                    yaxis: { title: 'Temperature (°C)', gridcolor: '#E5E7EB', showgrid: true },
+                    yaxis: { title: 'Temperature (°C)', gridcolor: '#E5E7EB', showgrid: true, range: [0, 100], autorange: false },
                     margin: { t: 50, r: 150, b: 50, l: 60 },
                     showlegend: true,
                     legend: {
