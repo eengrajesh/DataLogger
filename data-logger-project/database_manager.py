@@ -109,26 +109,26 @@ class SQLiteDatabase(DatabaseInterface):
         cursor = self.conn.cursor()
         cutoff_time = datetime.now() - timedelta(hours=hours)
         cursor.execute('''
-            SELECT * FROM readings 
-            WHERE timestamp > ? 
+            SELECT * FROM readings
+            WHERE timestamp > ?
             ORDER BY timestamp DESC
-        ''', (cutoff_time,))
+        ''', (cutoff_time.isoformat(),))  # Convert to ISO format string
         return [dict(row) for row in cursor.fetchall()]
     
     def get_data_by_range(self, start_date: datetime, end_date: datetime, channel: Optional[int] = None) -> List[Dict]:
         cursor = self.conn.cursor()
         if channel:
             cursor.execute('''
-                SELECT * FROM readings 
+                SELECT * FROM readings
                 WHERE timestamp BETWEEN ? AND ? AND thermocouple_id = ?
                 ORDER BY timestamp
-            ''', (start_date, end_date, channel))
+            ''', (start_date.isoformat(), end_date.isoformat(), channel))
         else:
             cursor.execute('''
-                SELECT * FROM readings 
+                SELECT * FROM readings
                 WHERE timestamp BETWEEN ? AND ?
                 ORDER BY timestamp
-            ''', (start_date, end_date))
+            ''', (start_date.isoformat(), end_date.isoformat()))
         return [dict(row) for row in cursor.fetchall()]
     
     def clear_all_data(self):
