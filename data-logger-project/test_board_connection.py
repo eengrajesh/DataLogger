@@ -84,7 +84,7 @@ except Exception as e:
 print("\n[6] DAQ Connection Test")
 try:
     print("    Creating SMtc instance...")
-    daq = SMtc(stack=0, i2c_bus=1)
+    daq = SMtc(stack=0, i2c=1)
     print(f"    DAQ object created")
     print(f"    Type: {type(daq).__name__}")
 
