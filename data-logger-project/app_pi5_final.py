@@ -114,10 +114,24 @@ def api_connect():
             app_state['daq_connected'] = result
             if result:
                 send_telegram_message("DAQ Connected - Hardware connection established")
-            return jsonify({"status": "connected" if result else "failed"})
+                board_info = get_board_info()
+                return jsonify({
+                    "status": "success",
+                    "board_info": board_info
+                })
+            else:
+                return jsonify({"status": "failed", "message": "Connection failed"})
         else:
             app_state['daq_connected'] = True
-            return jsonify({"status": "connected", "simulated": True})
+            return jsonify({
+                "status": "success",
+                "board_info": {
+                    "connected": True,
+                    "simulated": True,
+                    "type": "Mock DAQ",
+                    "channels": 8
+                }
+            })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -127,10 +141,24 @@ def api_disconnect():
         if DATA_LOGGER_AVAILABLE:
             result = disconnect()
             app_state['daq_connected'] = False
-            return jsonify({"status": "disconnected" if result else "failed"})
+            if result:
+                return jsonify({
+                    "status": "success",
+                    "board_info": {
+                        "connected": False
+                    }
+                })
+            else:
+                return jsonify({"status": "failed", "message": "Disconnect failed"})
         else:
             app_state['daq_connected'] = False
-            return jsonify({"status": "disconnected", "simulated": True})
+            return jsonify({
+                "status": "success",
+                "board_info": {
+                    "connected": False,
+                    "simulated": True
+                }
+            })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -147,10 +175,11 @@ def api_start_logging():
             app_state['logging_active'] = True
             result = True
             send_telegram_message("**Logging Started** (Simulated mode)")
-        
+
         return jsonify({
-            "status": "started" if result else "failed",
-            "message": "Logging started successfully" if result else "Failed to start logging"
+            "status": "success" if result else "failed",
+            "message": "Logging started successfully" if result else "Failed to start logging",
+            "logging_active": result
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -167,10 +196,11 @@ def api_stop_logging():
             app_state['logging_active'] = False
             result = True
             send_telegram_message("**Logging Stopped** (Simulated mode)")
-        
+
         return jsonify({
-            "status": "stopped" if result else "failed",
-            "message": "Logging stopped successfully" if result else "Failed to stop logging"
+            "status": "success" if result else "failed",
+            "message": "Logging stopped successfully" if result else "Failed to stop logging",
+            "logging_active": False
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
