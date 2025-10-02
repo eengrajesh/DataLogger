@@ -254,32 +254,14 @@ def api_live_data(channel):
 @app.route('/api/data/latest')
 def api_latest_data():
     try:
-        data = {}
-        current_time = datetime.now().isoformat()
-        
-        for channel in range(1, 9):
-            if DATA_LOGGER_AVAILABLE:
-                try:
-                    temp = daq.get(channel) / 10.0
-                    data[f"thermocouple_{channel}"] = {
-                        "temperature": round(temp, 2),
-                        "timestamp": current_time
-                    }
-                    continue
-                except:
-                    pass
-            
-            # Simulated data
-            base_temp = 20.0 + (channel * 4)
-            variation = (time.time() % 30) * 0.4
-            temp = base_temp + variation + (channel * 0.5)
-            data[f"thermocouple_{channel}"] = {
-                "temperature": round(temp, 2),
-                "timestamp": current_time,
-                "simulated": True
-            }
-        
-        return jsonify(data)
+        # Get latest readings from database (saved by logging thread)
+        latest_readings = db_manager.get_latest_readings()
+
+        if latest_readings and len(latest_readings) > 0:
+            return jsonify(latest_readings)
+        else:
+            # No data in database yet - return empty array
+            return jsonify([])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -287,64 +269,18 @@ def api_latest_data():
 def api_historical_data():
     try:
         hours = request.args.get('hours', 24, type=int)
-        end_time = datetime.now()
-        start_time = end_time - timedelta(hours=hours)
-        
-        # Try to get real data from database first
+
+        # Get real data from database using the database manager
         try:
-            query = """
-            SELECT timestamp, thermocouple_id, temperature 
-            FROM readings 
-            WHERE timestamp >= ? AND timestamp <= ?
-            ORDER BY timestamp
-            """
-            rows = db_manager.execute_query(query, (start_time.isoformat(), end_time.isoformat()))
-            
-            if rows and len(rows) > 10:  # If we have enough real data
-                data = []
-                for row in rows:
-                    data.append({
-                        "timestamp": row[0],
-                        "thermocouple_id": row[1],
-                        "temperature": row[2]
-                    })
+            data = db_manager.get_historical_data(hours=hours)
+
+            if data and len(data) > 0:  # If we have real data
                 return jsonify(data)
         except Exception as e:
             print(f"Database query failed: {e}")
-        
-        # Generate simulated historical data with realistic trends
-        data = []
-        current_time = start_time
-        
-        while current_time <= end_time:
-            for channel in range(1, 9):
-                # Create realistic temperature curves
-                base_temp = 20.0 + (channel * 4)
-                
-                # Daily temperature cycle
-                hour_of_day = current_time.hour
-                daily_variation = 5 * abs(12 - hour_of_day) / 12
-                
-                # Long-term trend
-                time_ratio = (current_time - start_time).total_seconds() / (hours * 3600)
-                trend = 2 * time_ratio
-                
-                # Random variation
-                random_variation = (current_time.timestamp() % 17) * 0.3
-                
-                temp = base_temp + daily_variation + trend + random_variation + (channel * 0.3)
-                
-                data.append({
-                    "timestamp": current_time.isoformat(),
-                    "thermocouple_id": channel,
-                    "temperature": round(temp, 2),
-                    "simulated": True
-                })
-            
-            # Data point every 5 minutes
-            current_time += timedelta(minutes=5)
-        
-        return jsonify(data)
+
+        # No data available - return empty array (not simulated data)
+        return jsonify([])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
