@@ -14,8 +14,13 @@ from config import config
 daq = sm_tc.SMtc(0, 1)
 
 # --- Database and Storage ---
-db_manager = DatabaseManager()
+db_manager = None  # Will be set by the Flask app
 storage_manager = StorageManager()
+
+def set_database_manager(manager):
+    """Set the database manager to use (called by Flask app)"""
+    global db_manager
+    db_manager = manager
 
 # --- Configuration ---
 NUMBER_OF_CHANNELS = 8
@@ -99,7 +104,10 @@ def log_temperatures():
                             )
                             
                             # Then log to database
-                            db_manager.insert_reading(thermocouple_id=i, temperature=corrected_temp)
+                            if db_manager:
+                                db_manager.insert_reading(thermocouple_id=i, temperature=corrected_temp)
+                            else:
+                                print(f"Warning: db_manager not set, skipping database insert")
                             print(f"Logged: Ch {i}, Temp: {corrected_temp:.2f}°C, Int: {interval}s")
                             last_log_time[i] = current_time
                         else:

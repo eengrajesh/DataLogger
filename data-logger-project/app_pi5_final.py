@@ -20,11 +20,12 @@ from config import config
 # Import data logger functions
 try:
     from data_logger import (
-        start_logging_thread, stop_logging_thread, daq, 
-        get_board_info, connect, disconnect, 
-        set_sensor_status, get_sensor_status, 
-        set_sensor_interval, get_sensor_intervals, 
-        get_cpu_temperature, is_logging, is_connected
+        start_logging_thread, stop_logging_thread, daq,
+        get_board_info, connect, disconnect,
+        set_sensor_status, get_sensor_status,
+        set_sensor_interval, get_sensor_intervals,
+        get_cpu_temperature, is_logging, is_connected,
+        set_database_manager
     )
     DATA_LOGGER_AVAILABLE = True
 except ImportError as e:
@@ -50,6 +51,10 @@ except ImportError:
 app = Flask(__name__)
 db_manager = DatabaseManager()
 storage_manager = StorageManager()
+
+# Share database manager with data_logger module
+if DATA_LOGGER_AVAILABLE:
+    set_database_manager(db_manager)
 
 # Application state
 app_state = {
