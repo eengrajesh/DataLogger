@@ -112,6 +112,11 @@ def api_cpu_temp():
     """API endpoint to get the CPU temperature."""
     return jsonify(get_cpu_temperature())
 
+@app.route('/api/cpu_temperature')
+def api_cpu_temperature():
+    """API endpoint to get the CPU temperature (alternate endpoint name)."""
+    return jsonify(get_cpu_temperature())
+
 @app.route('/api/data/clear', methods=['POST'])
 def api_clear_data():
     """API endpoint to clear all data from the database."""
