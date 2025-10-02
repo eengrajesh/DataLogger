@@ -85,9 +85,10 @@ class SQLiteDatabase(DatabaseInterface):
     
     def insert_reading(self, thermocouple_id: int, temperature: float):
         cursor = self.conn.cursor()
+        # Use explicit local timestamp instead of CURRENT_TIMESTAMP (which is UTC)
         cursor.execute(
-            'INSERT INTO readings (thermocouple_id, temperature) VALUES (?, ?)',
-            (thermocouple_id, temperature)
+            'INSERT INTO readings (timestamp, thermocouple_id, temperature) VALUES (?, ?, ?)',
+            (datetime.now().isoformat(), thermocouple_id, temperature)
         )
         self.conn.commit()
     
