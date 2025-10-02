@@ -486,11 +486,50 @@ Uptime: {system_data.get('uptime', 'Unknown')}"""
             
         else:
             send_telegram_message("Unknown command. Send /start for help.", chat_id)
-        
+
         return jsonify({"status": "processed"})
     except Exception as e:
         print(f"Command processing error: {e}")
         return jsonify({"status": "error", "message": str(e)})
+
+# Missing API endpoints that dashboard requires
+@app.route('/api/gpio/status')
+def api_gpio_status():
+    """GPIO status endpoint - returns empty status (GPIO not implemented yet)"""
+    return jsonify({
+        "buttons": {},
+        "leds": {},
+        "available": False
+    })
+
+@app.route('/api/cpu_temperature')
+def api_cpu_temperature_alt():
+    """Alternate CPU temperature endpoint for dashboard compatibility"""
+    try:
+        return jsonify(get_cpu_temperature())
+    except:
+        return jsonify({"cpu_temp": 0, "error": "Not available"})
+
+@app.route('/api/textfiles/stats')
+def api_textfiles_stats():
+    """Text file statistics endpoint"""
+    return jsonify({
+        "enabled": False,
+        "files_count": 0,
+        "total_size": 0
+    })
+
+@app.route('/api/notifications/status')
+def api_notifications_status():
+    """Notification status endpoint"""
+    try:
+        return jsonify({
+            "enabled": notification_system.enabled if 'notification_system' in globals() else False,
+            "email_configured": False,
+            "sms_configured": False
+        })
+    except:
+        return jsonify({"enabled": False})
 
 if __name__ == '__main__':
     port = config.get('system.web_port', 8080)
