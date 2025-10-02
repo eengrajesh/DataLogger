@@ -531,6 +531,26 @@ def api_notifications_status():
     except:
         return jsonify({"enabled": False})
 
+@app.route('/api/notifications/config')
+def api_notifications_config():
+    """Notification configuration endpoint"""
+    return jsonify({
+        "email": {
+            "enabled": False,
+            "smtp_server": "",
+            "smtp_port": 587,
+            "from_address": "",
+            "to_addresses": []
+        },
+        "sms": {
+            "enabled": False
+        },
+        "alerts": {
+            "high_temp_threshold": 80,
+            "low_temp_threshold": 10
+        }
+    })
+
 if __name__ == '__main__':
     port = config.get('system.web_port', 8080)
     debug = config.get('system.debug_mode', False)
