@@ -262,12 +262,18 @@ def api_latest_data():
         # Get latest readings from database (saved by logging thread)
         latest_readings = db_manager.get_latest_readings()
 
+        print(f"[DEBUG] /api/data/latest called - Found {len(latest_readings) if latest_readings else 0} readings")
+        if latest_readings:
+            print(f"[DEBUG] Sample data: {latest_readings[0] if len(latest_readings) > 0 else 'None'}")
+
         if latest_readings and len(latest_readings) > 0:
             return jsonify(latest_readings)
         else:
             # No data in database yet - return empty array
+            print("[DEBUG] Returning empty array - no data in database")
             return jsonify([])
     except Exception as e:
+        print(f"[ERROR] /api/data/latest failed: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/data/historical')
@@ -275,17 +281,47 @@ def api_historical_data():
     try:
         hours = request.args.get('hours', 24, type=int)
 
+        print(f"[DEBUG] /api/data/historical called - Requesting last {hours} hours")
+
         # Get real data from database using the database manager
         try:
             data = db_manager.get_historical_data(hours=hours)
 
-            if data and len(data) > 0:  # If we have real data
+            print(f"[DEBUG] /api/data/historical - Found {len(data) if data else 0} readings")
+            if data and len(data) > 0:
+                print(f"[DEBUG] Sample historical data: {data[0]}")
                 return jsonify(data)
         except Exception as e:
-            print(f"Database query failed: {e}")
+            print(f"[ERROR] Database query failed: {e}")
 
         # No data available - return empty array (not simulated data)
+        print("[DEBUG] Returning empty array - no historical data")
         return jsonify([])
+    except Exception as e:
+        print(f"[ERROR] /api/data/historical failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ============= Debug Endpoint =============
+@app.route('/api/debug/database')
+def api_debug_database():
+    """Debug endpoint to check database contents"""
+    try:
+        # Get raw count
+        cursor = db_manager.db.conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM readings")
+        total_count = cursor.fetchone()[0]
+
+        # Get last 5 readings
+        cursor.execute("SELECT * FROM readings ORDER BY id DESC LIMIT 5")
+        recent = [dict(row) for row in cursor.fetchall()]
+
+        return jsonify({
+            "total_readings": total_count,
+            "recent_readings": recent,
+            "db_path": db_manager.db.db_path if hasattr(db_manager.db, 'db_path') else 'unknown',
+            "logging_active": is_logging() if DATA_LOGGER_AVAILABLE else False,
+            "board_connected": is_connected() if DATA_LOGGER_AVAILABLE else False
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

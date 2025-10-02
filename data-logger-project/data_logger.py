@@ -106,8 +106,9 @@ def log_temperatures():
                             # Then log to database
                             if db_manager:
                                 db_manager.insert_reading(thermocouple_id=i, temperature=corrected_temp)
+                                print(f"[DEBUG] Successfully inserted to DB: Ch {i}, Temp: {corrected_temp:.2f}°C")
                             else:
-                                print(f"Warning: db_manager not set, skipping database insert")
+                                print(f"[ERROR] db_manager not set, skipping database insert")
                             print(f"Logged: Ch {i}, Temp: {corrected_temp:.2f}°C, Int: {interval}s")
                             last_log_time[i] = current_time
                         else:
