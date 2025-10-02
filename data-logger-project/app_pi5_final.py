@@ -315,12 +315,37 @@ def api_debug_database():
         cursor.execute("SELECT * FROM readings ORDER BY id DESC LIMIT 5")
         recent = [dict(row) for row in cursor.fetchall()]
 
+        # Get database file size
+        import os
+        db_path = db_manager.db.db_path if hasattr(db_manager.db, 'db_path') else 'datalogger.db'
+        db_full_path = os.path.join(os.path.dirname(__file__), db_path)
+        db_size_bytes = os.path.getsize(db_full_path) if os.path.exists(db_full_path) else 0
+        db_size_mb = db_size_bytes / (1024 * 1024)
+        db_size_kb = db_size_bytes / 1024
+
+        # Get oldest and newest timestamps
+        cursor.execute("SELECT MIN(timestamp), MAX(timestamp) FROM readings")
+        oldest, newest = cursor.fetchone()
+
+        # Calculate data per channel
+        cursor.execute("SELECT thermocouple_id, COUNT(*) FROM readings GROUP BY thermocouple_id ORDER BY thermocouple_id")
+        channel_counts = {row[0]: row[1] for row in cursor.fetchall()}
+
         return jsonify({
             "total_readings": total_count,
+            "db_size_bytes": db_size_bytes,
+            "db_size_kb": round(db_size_kb, 2),
+            "db_size_mb": round(db_size_mb, 2),
+            "db_path": db_full_path,
+            "oldest_reading": oldest,
+            "newest_reading": newest,
+            "channel_counts": channel_counts,
             "recent_readings": recent,
-            "db_path": db_manager.db.db_path if hasattr(db_manager.db, 'db_path') else 'unknown',
             "logging_active": is_logging() if DATA_LOGGER_AVAILABLE else False,
-            "board_connected": is_connected() if DATA_LOGGER_AVAILABLE else False
+            "board_connected": is_connected() if DATA_LOGGER_AVAILABLE else False,
+            "logging_interval_seconds": 5,
+            "estimated_readings_per_hour": 8 * (3600 / 5),  # 8 channels * 720 readings/hour
+            "estimated_readings_per_day": 8 * (3600 / 5) * 24
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
