@@ -298,5 +298,25 @@ def api_system_status():
             "error": str(e)
         }), 500
 
+@app.route('/api/gpio/status')
+def api_gpio_status():
+    """API endpoint for GPIO status - stub endpoint to prevent errors"""
+    # GPIO functionality is optional - return empty status if not implemented
+    return jsonify({
+        "buttons": {
+            "START": {"pressed": False, "enabled": False},
+            "SHUTDOWN": {"pressed": False, "enabled": False},
+            "EXPORT": {"pressed": False, "enabled": False},
+            "WIFI": {"pressed": False, "enabled": False}
+        },
+        "leds": {
+            "SYSTEM": {"on": False, "enabled": False},
+            "LOGGING": {"on": False, "enabled": False},
+            "CONNECTED": {"on": False, "enabled": False},
+            "ERROR": {"on": False, "enabled": False}
+        },
+        "available": False
+    })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=True)
