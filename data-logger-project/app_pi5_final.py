@@ -57,12 +57,14 @@ if DATA_LOGGER_AVAILABLE:
     set_database_manager(db_manager)
 
 # Application state
+import time as time_module
 app_state = {
     'logging_active': False,
     'daq_connected': False,
     'telegram_token': config.get('telegram.bot_token', ''),
     'admin_users': config.get('telegram.admin_users', []),
-    'startup_time': datetime.now()
+    'startup_time': datetime.now(),
+    'start_time': time_module.time()
 }
 
 def send_telegram_message(message, chat_id=None):
@@ -611,6 +613,110 @@ def api_notifications_config():
             "low_temp_threshold": 10
         }
     })
+
+# ============= Database Configuration API =============
+@app.route('/api/database/switch', methods=['POST'])
+def api_database_switch():
+    """Switch database configuration"""
+    try:
+        data = request.get_json()
+        db_type = data.get('type', 'sqlite')
+        config = data.get('config', {})
+
+        # Build kwargs for switch_database
+        kwargs = {}
+        if db_type in ['postgresql', 'both']:
+            if config.get('host'):
+                kwargs['host'] = config['host']
+            if config.get('port'):
+                kwargs['port'] = int(config['port'])
+            if config.get('database'):
+                kwargs['database'] = config['database']
+            if config.get('username'):
+                kwargs['username'] = config['username']
+            if config.get('password'):
+                kwargs['password'] = config['password']
+
+        # Switch database
+        db_manager.switch_database(db_type, **kwargs)
+
+        # Get connection status
+        status = db_manager.get_connection_status()
+
+        return jsonify({
+            "success": True,
+            "type": db_type,
+            "info": status.get('info', {}),
+            "message": f"Successfully switched to {db_type} database mode"
+        })
+
+    except Exception as e:
+        print(f"[ERROR] Database switch failed: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/database/status')
+def api_database_status():
+    """Get current database status"""
+    try:
+        status = db_manager.get_connection_status()
+        return jsonify(status)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ============= Network Status API =============
+@app.route('/api/network_status')
+def api_network_status():
+    """Get network and connectivity status"""
+    try:
+        import socket
+        import time
+
+        # Get local IP address
+        local_ip = "Unknown"
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+        except:
+            pass
+
+        # Check internet connectivity
+        internet_connected = False
+        try:
+            socket.create_connection(("8.8.8.8", 53), timeout=3)
+            internet_connected = True
+        except:
+            pass
+
+        # Check if Telegram bot is active
+        telegram_active = app_state.get('telegram_token') and TELEGRAM_BOT_AVAILABLE
+
+        # Calculate uptime (if available from system start)
+        uptime_seconds = None
+        if 'start_time' in app_state:
+            uptime_seconds = int(time.time() - app_state['start_time'])
+
+        return jsonify({
+            "local_ip": local_ip,
+            "internet_connected": internet_connected,
+            "telegram_active": telegram_active,
+            "uptime_seconds": uptime_seconds,
+            "timestamp": datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        print(f"[ERROR] Network status check failed: {e}")
+        return jsonify({
+            "local_ip": "Unknown",
+            "internet_connected": False,
+            "telegram_active": False,
+            "uptime_seconds": None,
+            "error": str(e)
+        })
 
 if __name__ == '__main__':
     port = config.get('system.web_port', 8080)

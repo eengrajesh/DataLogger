@@ -263,55 +263,222 @@ class PostgreSQLDatabase(DatabaseInterface):
             'record_count': record_count
         }
 
+class DualDatabaseManager:
+    """Manages dual database storage - writes to both SQLite and PostgreSQL simultaneously"""
+
+    def __init__(self, sqlite_db: SQLiteDatabase, postgres_db: PostgreSQLDatabase):
+        self.sqlite_db = sqlite_db
+        self.postgres_db = postgres_db
+        self.active = True
+
+    def insert_reading(self, thermocouple_id: int, temperature: float):
+        """Insert reading to both databases"""
+        errors = []
+
+        # Try SQLite
+        try:
+            self.sqlite_db.insert_reading(thermocouple_id, temperature)
+        except Exception as e:
+            errors.append(f"SQLite: {e}")
+
+        # Try PostgreSQL
+        try:
+            self.postgres_db.insert_reading(thermocouple_id, temperature)
+        except Exception as e:
+            errors.append(f"PostgreSQL: {e}")
+
+        if errors:
+            print(f"[DualDB] Errors during insert: {', '.join(errors)}")
+
+    def get_latest_readings(self) -> List[Dict]:
+        """Get latest readings (from SQLite as primary)"""
+        try:
+            return self.sqlite_db.get_latest_readings()
+        except Exception as e:
+            print(f"[DualDB] SQLite failed, trying PostgreSQL: {e}")
+            return self.postgres_db.get_latest_readings()
+
+    def get_historical_data(self, hours: int = 24) -> List[Dict]:
+        """Get historical data (from SQLite as primary)"""
+        try:
+            return self.sqlite_db.get_historical_data(hours)
+        except Exception as e:
+            print(f"[DualDB] SQLite failed, trying PostgreSQL: {e}")
+            return self.postgres_db.get_historical_data(hours)
+
+    def get_data_by_range(self, start_date: datetime, end_date: datetime, channel: Optional[int] = None) -> List[Dict]:
+        """Get data by range (from SQLite as primary)"""
+        try:
+            return self.sqlite_db.get_data_by_range(start_date, end_date, channel)
+        except Exception as e:
+            print(f"[DualDB] SQLite failed, trying PostgreSQL: {e}")
+            return self.postgres_db.get_data_by_range(start_date, end_date, channel)
+
+    def clear_all_data(self):
+        """Clear data from both databases"""
+        errors = []
+
+        try:
+            self.sqlite_db.clear_all_data()
+        except Exception as e:
+            errors.append(f"SQLite: {e}")
+
+        try:
+            self.postgres_db.clear_all_data()
+        except Exception as e:
+            errors.append(f"PostgreSQL: {e}")
+
+        if errors:
+            print(f"[DualDB] Errors during clear: {', '.join(errors)}")
+
+    def get_storage_info(self) -> Dict:
+        """Get storage info from both databases"""
+        sqlite_info = {}
+        postgres_info = {}
+
+        try:
+            sqlite_info = self.sqlite_db.get_storage_info()
+        except Exception as e:
+            sqlite_info = {'error': str(e)}
+
+        try:
+            postgres_info = self.postgres_db.get_storage_info()
+        except Exception as e:
+            postgres_info = {'error': str(e)}
+
+        return {
+            'type': 'Dual (SQLite + PostgreSQL)',
+            'sqlite': sqlite_info,
+            'postgresql': postgres_info
+        }
+
+    def disconnect(self):
+        """Disconnect both databases"""
+        try:
+            self.sqlite_db.disconnect()
+        except Exception as e:
+            print(f"[DualDB] Error disconnecting SQLite: {e}")
+
+        try:
+            self.postgres_db.disconnect()
+        except Exception as e:
+            print(f"[DualDB] Error disconnecting PostgreSQL: {e}")
+
 class DatabaseManager:
     def __init__(self):
         self.db = None
         self.db_type = config.get('database.type', 'sqlite')
+        self.sqlite_instance = None
+        self.postgres_instance = None
         self.initialize_database()
-    
+
     def initialize_database(self):
         if self.db_type == 'postgresql' and POSTGRES_AVAILABLE:
             try:
                 self.db = PostgreSQLDatabase()
+                self.postgres_instance = self.db
                 print("Connected to PostgreSQL database")
             except Exception as e:
                 print(f"Failed to connect to PostgreSQL: {e}, falling back to SQLite")
                 self.db_type = 'sqlite'
                 self.db = SQLiteDatabase()
+                self.sqlite_instance = self.db
+        elif self.db_type == 'both':
+            # Dual database mode
+            try:
+                self.sqlite_instance = SQLiteDatabase()
+                print("SQLite database initialized")
+            except Exception as e:
+                print(f"Failed to initialize SQLite: {e}")
+                self.sqlite_instance = None
+
+            try:
+                if POSTGRES_AVAILABLE:
+                    self.postgres_instance = PostgreSQLDatabase()
+                    print("PostgreSQL database initialized")
+                else:
+                    print("PostgreSQL not available, skipping")
+                    self.postgres_instance = None
+            except Exception as e:
+                print(f"Failed to initialize PostgreSQL: {e}")
+                self.postgres_instance = None
+
+            if self.sqlite_instance and self.postgres_instance:
+                self.db = DualDatabaseManager(self.sqlite_instance, self.postgres_instance)
+                print("Using DUAL database mode (SQLite + PostgreSQL)")
+            elif self.sqlite_instance:
+                self.db = self.sqlite_instance
+                self.db_type = 'sqlite'
+                print("PostgreSQL unavailable, using SQLite only")
+            else:
+                raise Exception("Failed to initialize any database")
         else:
             self.db = SQLiteDatabase()
+            self.sqlite_instance = self.db
             print("Using SQLite database")
-    
+
     def switch_database(self, db_type: str, **kwargs):
+        """Switch database mode: 'sqlite', 'postgresql', or 'both'"""
         if self.db:
             self.db.disconnect()
-        
+
         if db_type == 'postgresql':
             if not POSTGRES_AVAILABLE:
                 raise ImportError("PostgreSQL support not available")
-            
+
             # Update config if kwargs provided
             if kwargs:
                 for key, value in kwargs.items():
                     config.set(f'database.postgresql.{key}', value)
-            
-            self.db = PostgreSQLDatabase()
+
+            self.postgres_instance = PostgreSQLDatabase()
+            self.db = self.postgres_instance
             config.set('database.type', 'postgresql')
-        else:
+
+        elif db_type == 'both':
+            # Initialize both databases
+            if 'sqlite_path' in kwargs:
+                config.set('database.sqlite.path', kwargs['sqlite_path'])
+
+            if kwargs:
+                for key, value in kwargs.items():
+                    if key.startswith('pg_'):
+                        config.set(f'database.postgresql.{key[3:]}', value)
+
+            self.sqlite_instance = SQLiteDatabase()
+
+            if POSTGRES_AVAILABLE:
+                self.postgres_instance = PostgreSQLDatabase()
+                self.db = DualDatabaseManager(self.sqlite_instance, self.postgres_instance)
+                config.set('database.type', 'both')
+            else:
+                print("PostgreSQL not available, using SQLite only")
+                self.db = self.sqlite_instance
+                config.set('database.type', 'sqlite')
+
+        else:  # sqlite
             if 'path' in kwargs:
                 config.set('database.sqlite.path', kwargs['path'])
-            self.db = SQLiteDatabase()
+            self.sqlite_instance = SQLiteDatabase()
+            self.db = self.sqlite_instance
             config.set('database.type', 'sqlite')
-        
+
         self.db_type = db_type
-    
+
     def get_connection_status(self) -> Dict:
-        return {
+        status = {
             'connected': self.db is not None,
             'type': self.db_type,
             'info': self.db.get_storage_info() if self.db else {}
         }
-    
+
+        # Add individual database status for dual mode
+        if self.db_type == 'both':
+            status['sqlite_connected'] = self.sqlite_instance is not None
+            status['postgres_connected'] = self.postgres_instance is not None
+
+        return status
+
     def __getattr__(self, name):
         # Proxy all other calls to the database instance
         if self.db and hasattr(self.db, name):
