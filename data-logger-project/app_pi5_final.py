@@ -350,6 +350,19 @@ def api_debug_database():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ============= System Status API =============
+@app.route('/api/status')
+def api_status():
+    """Get current system status"""
+    try:
+        return jsonify({
+            "board_connected": is_connected() if DATA_LOGGER_AVAILABLE else False,
+            "logging_active": is_logging() if DATA_LOGGER_AVAILABLE else False,
+            "board_info": get_board_info() if DATA_LOGGER_AVAILABLE else None
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # ============= System APIs =============
 @app.route('/api/board_info')
 def api_board_info():

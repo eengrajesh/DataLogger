@@ -1189,6 +1189,29 @@
             Plotly.newPlot('temperature-graph', [], layout, config);
         }
 
+        // Check system status on page load
+        async function checkSystemStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+
+                console.log('[DEBUG] Page loaded - System status:', data);
+
+                // Update board connection status
+                if (data.board_info && data.board_info.board_info) {
+                    updateBoardStatus(data.board_info.board_info.connected);
+                } else {
+                    updateBoardStatus(false);
+                }
+
+                // Update logging status
+                updateLoggingStatus(data.logging_active);
+
+            } catch (error) {
+                console.error('Error checking system status:', error);
+            }
+        }
+
         // API Functions
         async function connectBoard() {
             try {
@@ -2054,6 +2077,9 @@
             setInterval(updateNotificationStatus, 15000);  // Update notification status every 15 seconds
             setInterval(updateGPIOStatus, 1000);  // Update GPIO status every second
             
+            // Check current system status on page load
+            checkSystemStatus();
+
             // Update status tiles
             updateActiveChannelCount();
             updateCpuTemperature();  // Initial CPU temp check
