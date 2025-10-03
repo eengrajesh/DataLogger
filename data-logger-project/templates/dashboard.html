@@ -73,23 +73,25 @@
         .logo-container {
             width: 50px;
             height: 50px;
-            background: var(--brand-gradient);
+            background: white;
             border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
             box-shadow: 0 4px 12px rgba(30, 64, 175, 0.2);
             position: relative;
+            overflow: hidden;
+            padding: 5px;
         }
 
         .logo-container img {
-            width: 35px;
-            height: 35px;
+            max-width: 100%;
+            max-height: 100%;
             object-fit: contain;
         }
         
         .logo-fallback {
-            color: white;
+            color: var(--primary);
             font-size: 24px;
         }
 
@@ -1882,8 +1884,6 @@
             const svgImg = new Image();
             svgImg.onload = function() {
                 logoContainer.innerHTML = '';
-                svgImg.style.height = '40px';
-                svgImg.style.width = 'auto';
                 logoContainer.appendChild(svgImg);
             };
 
@@ -1892,13 +1892,12 @@
                 const img = new Image();
                 img.onload = function() {
                     logoContainer.innerHTML = '';
-                    img.style.height = '35px';
-                    img.style.width = 'auto';
                     logoContainer.appendChild(img);
                 };
 
                 img.onerror = function() {
-                    // Keep the fallback icon
+                    // Keep the fallback icon - change background back to gradient
+                    logoContainer.style.background = 'var(--brand-gradient)';
                     console.log('Logo files not found, using fallback icon');
                 };
 
