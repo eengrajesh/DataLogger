@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Enertherm Temperature Data Logger System
-Version 2.0.0 - January 2025
+Version 2.0.0 - October 2025
 
 Professional multi-channel temperature monitoring with K-type thermocouples.
 Supports real-time data logging, web dashboard, Telegram notifications,
@@ -739,7 +739,7 @@ def api_version():
     """Get system version and copyright information"""
     return jsonify({
         "version": __version__,
-        "build_date": "January 2025",
+        "build_date": "October 2025",
         "author": __author__,
         "copyright": __copyright__,
         "license": __license__,
