@@ -1964,37 +1964,36 @@
         // Function to load logo
         function loadLogo() {
             const logoContainer = document.getElementById('logoContainer');
-            const img = new Image();
-            
-            // Try to load logo.png first
-            img.onload = function() {
+
+            // Try to load modern SVG logo first (better quality)
+            const svgImg = new Image();
+            svgImg.onload = function() {
                 logoContainer.innerHTML = '';
-                img.style.width = '35px';
-                img.style.height = '35px';
-                img.style.filter = 'brightness(0) invert(1)';
-                logoContainer.appendChild(img);
+                svgImg.style.height = '40px';
+                svgImg.style.width = 'auto';
+                logoContainer.appendChild(svgImg);
             };
-            
-            img.onerror = function() {
-                // Try SVG next
-                const svgImg = new Image();
-                svgImg.onload = function() {
+
+            svgImg.onerror = function() {
+                // Fallback to PNG
+                const img = new Image();
+                img.onload = function() {
                     logoContainer.innerHTML = '';
-                    svgImg.style.width = '35px';
-                    svgImg.style.height = '35px';
-                    svgImg.style.filter = 'brightness(0) invert(1)';
-                    logoContainer.appendChild(svgImg);
+                    img.style.height = '35px';
+                    img.style.width = 'auto';
+                    logoContainer.appendChild(img);
                 };
-                
-                svgImg.onerror = function() {
+
+                img.onerror = function() {
                     // Keep the fallback icon
                     console.log('Logo files not found, using fallback icon');
                 };
-                
-                svgImg.src = '/static/logo.svg';
+
+                img.src = '/static/logo.png';
             };
-            
-            img.src = '/static/logo.png';
+
+            // Try modern logo first, then minimal, then original SVG
+            svgImg.src = '/static/logo-modern.svg';
         }
 
         // Function to update GPIO status

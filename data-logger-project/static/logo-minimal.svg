@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="500" height="100" viewBox="0 0 500 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="tempGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="50%" style="stop-color:#f59e0b"/>
+      <stop offset="100%" style="stop-color:#ef4444"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Simple E icon with temperature bar -->
+  <g id="icon-minimal">
+    <!-- E letter shape -->
+    <rect x="10" y="20" width="30" height="8" rx="4" fill="#1e40af"/>
+    <rect x="10" y="20" width="8" height="60" rx="4" fill="#1e40af"/>
+    <rect x="10" y="46" width="25" height="8" rx="4" fill="#1e40af"/>
+    <rect x="10" y="72" width="30" height="8" rx="4" fill="#1e40af"/>
+
+    <!-- Temperature bar -->
+    <rect x="48" y="20" width="6" height="60" rx="3" fill="#e5e7eb"/>
+    <rect x="48" y="35" width="6" height="45" rx="3" fill="url(#tempGrad)"/>
+
+    <!-- Degree symbol -->
+    <circle cx="51" cy="24" r="2" fill="#ef4444"/>
+  </g>
+
+  <!-- Clean typography -->
+  <text x="70" y="60" font-family="system-ui, -apple-system, sans-serif" font-size="42" font-weight="600" fill="#1e3a8a">
+    <tspan fill="#1e40af">ENER</tspan><tspan fill="#3b82f6">Therm</tspan>
+  </text>
+
+  <text x="70" y="85" font-family="system-ui, sans-serif" font-size="14" font-weight="400" fill="#9ca3af" letter-spacing="1.5">
+    ENGINEERING
+  </text>
+</svg>
