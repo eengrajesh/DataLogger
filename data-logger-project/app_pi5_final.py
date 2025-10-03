@@ -1,8 +1,23 @@
 #!/usr/bin/env python3
 """
-Pi5 Final DataLogger - Windows and Linux compatible
-Fixes all threading issues, graph display, and Telegram integration
+Enertherm Temperature Data Logger System
+Version 2.0.0 - January 2025
+
+Professional multi-channel temperature monitoring with K-type thermocouples.
+Supports real-time data logging, web dashboard, Telegram notifications,
+and dual database storage (SQLite + PostgreSQL).
+
+Copyright (c) 2025 Enertherm Engineering. All Rights Reserved.
+Licensed for commercial use only.
+
+Platform: Raspberry Pi 5 / Windows (development)
+Hardware: Sequent Microsystems 8-Thermocouple DAQ HAT
 """
+
+__version__ = "2.0.0"
+__author__ = "Enertherm Engineering"
+__copyright__ = "Copyright 2025, Enertherm Engineering"
+__license__ = "Proprietary"
 
 from flask import Flask, render_template, jsonify, request, send_file, send_from_directory
 from database_manager import DatabaseManager
@@ -718,13 +733,29 @@ def api_network_status():
             "error": str(e)
         })
 
+# ============= Version & Info API =============
+@app.route('/api/version')
+def api_version():
+    """Get system version and copyright information"""
+    return jsonify({
+        "version": __version__,
+        "build_date": "January 2025",
+        "author": __author__,
+        "copyright": __copyright__,
+        "license": __license__,
+        "product": "Temperature Data Logger System",
+        "platform": platform.system(),
+        "python_version": platform.python_version()
+    })
+
 if __name__ == '__main__':
     port = config.get('system.web_port', 8080)
     debug = config.get('system.debug_mode', False)
-    
-    print("=" * 60)
-    print("    ENERTHERM DATALOGGER - Pi5 FINAL VERSION")
-    print("=" * 60)
+
+    print("=" * 70)
+    print("    ENERTHERM ENGINEERING - TEMPERATURE DATA LOGGER SYSTEM")
+    print(f"    Version {__version__} - {__copyright__}")
+    print("=" * 70)
     print()
     
     try:
