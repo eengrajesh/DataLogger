@@ -1,6 +1,6 @@
 from flask import Flask, render_template, jsonify, send_from_directory, Response, request
-from database import get_latest_readings, get_historical_data, get_average_temperatures, clear_all_data, get_all_data
-from data_logger import start_logging_thread, stop_logging_thread, daq, get_board_info, connect, disconnect, get_storage_status, set_sensor_status, get_sensor_status, set_sensor_interval, get_sensor_intervals, get_cpu_temperature
+from database_manager import DatabaseManager
+from data_logger import start_logging_thread, stop_logging_thread, daq, get_board_info, connect, disconnect, get_storage_status, set_sensor_status, get_sensor_status, set_sensor_interval, get_sensor_intervals, get_cpu_temperature, set_database_manager
 from calibration import get_calibration_factors, set_calibration_factor
 from datetime import datetime
 import os
@@ -10,6 +10,10 @@ import io
 import csv
 
 app = Flask(__name__)
+
+# Initialize database manager
+db_manager = DatabaseManager()
+set_database_manager(db_manager)
 
 # Create static directory
 static_dir = os.path.join(os.path.dirname(__file__), 'static')
@@ -51,7 +55,7 @@ def classic():
 def api_latest_data():
     """API endpoint to get the latest reading for each thermocouple."""
     try:
-        readings = get_latest_readings()
+        readings = db_manager.get_latest_readings()
         return jsonify(readings)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -60,7 +64,7 @@ def api_latest_data():
 def api_historical_data():
     """API endpoint to get historical data for the charts."""
     try:
-        readings = get_historical_data(hours=24)
+        readings = db_manager.get_historical_data(hours=24)
         return jsonify(readings)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -121,7 +125,7 @@ def api_cpu_temperature():
 def api_clear_data():
     """API endpoint to clear all data from the database."""
     try:
-        clear_all_data()
+        db_manager.clear_all_data()
         return jsonify({"status": "success", "message": "All data cleared."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -130,7 +134,8 @@ def api_clear_data():
 def api_download_data(file_format):
     """API endpoint to download all data in a specified format."""
     try:
-        readings = get_all_data()
+        # Get all data from database
+        readings = db_manager.get_historical_data(hours=24*365*10)  # Get up to 10 years of data
 
         if not readings:
             return Response(
@@ -140,8 +145,14 @@ def api_download_data(file_format):
             )
 
         if file_format == 'json':
+            # Convert timestamp to ISO format if it's not already a string
             for reading in readings:
-                reading['timestamp'] = reading['timestamp'].isoformat()
+                if isinstance(reading.get('timestamp'), str):
+                    pass  # Already a string
+                elif hasattr(reading.get('timestamp'), 'isoformat'):
+                    reading['timestamp'] = reading['timestamp'].isoformat()
+                else:
+                    reading['timestamp'] = str(reading.get('timestamp'))
             
             output = json.dumps(readings, indent=4)
             return Response(
@@ -174,7 +185,33 @@ def api_download_data(file_format):
 def api_average_data():
     """API endpoint to get the average temperature for each thermocouple."""
     try:
-        avg_temps = get_average_temperatures()
+        # Calculate averages from historical data
+        all_data = db_manager.get_historical_data(hours=24*365*10)
+
+        # Group by thermocouple_id and calculate averages
+        averages = {}
+        counts = {}
+
+        for reading in all_data:
+            tc_id = reading['thermocouple_id']
+            temp = reading['temperature']
+
+            if tc_id not in averages:
+                averages[tc_id] = 0
+                counts[tc_id] = 0
+
+            averages[tc_id] += temp
+            counts[tc_id] += 1
+
+        # Format result
+        avg_temps = [
+            {
+                'thermocouple_id': tc_id,
+                'avg_temp': averages[tc_id] / counts[tc_id]
+            }
+            for tc_id in sorted(averages.keys())
+        ]
+
         return jsonify(avg_temps)
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
