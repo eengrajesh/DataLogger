@@ -20,8 +20,8 @@ pkill -f "python.*app.py" 2>/dev/null
 sleep 1
 
 # Check if Python and app file exist
-if [ ! -f "app_pi5_final.py" ]; then
-    echo "❌ ERROR: app_pi5_final.py not found!"
+if [ ! -f "app.py" ]; then
+    echo "ERROR: app.py not found!"
     echo "   Current directory: $(pwd)"
     echo ""
     read -p "Press Enter to close..."
@@ -31,7 +31,7 @@ fi
 # Start application
 echo "Starting DataLogger application..."
 echo ""
-python3 app_pi5_final.py > /tmp/datalogger.log 2>&1 &
+python3 app.py > /tmp/datalogger.log 2>&1 &
 APP_PID=$!
 
 # Wait for server to start
@@ -77,7 +77,7 @@ echo "Dashboard URL: http://localhost:8080"
 echo "Application PID: $APP_PID"
 echo "Log file: /tmp/datalogger.log"
 echo ""
-echo "To stop: pkill -f app_pi5_final.py"
+echo "To stop: pkill -f app.py"
 echo ""
 echo "Press Ctrl+C or close this window to keep running in background"
 echo ""

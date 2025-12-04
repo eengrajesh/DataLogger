@@ -2,9 +2,9 @@
 Version=1.0
 Type=Application
 Name=DataLogger
-Comment=Temperature Data Logger Application
+Comment=Temperature Data Logger - Web Dashboard
 Exec=bash -c 'cd ~/DataLogger/data-logger-project && ./start_datalogger.sh'
-Icon=
+Icon=utilities-system-monitor
 Terminal=true
 Categories=Application;Science;
 StartupNotify=true
