@@ -53,6 +53,16 @@ class Config:
             'from_email': '',
             'to_emails': [],
             'alerts_enabled': True
+        },
+        'channels': {
+            '1': {'name': 'OVEN AIR', 'enabled': True},
+            '2': {'name': 'FRYER SURF', 'enabled': True},
+            '3': {'name': 'COAT MID', 'enabled': True},
+            '4': {'name': 'COAT RIGHT', 'enabled': True},
+            '5': {'name': 'COAT LEFT', 'enabled': True},
+            '6': {'name': 'STEEL MID', 'enabled': True},
+            '7': {'name': 'STEEL LEFT', 'enabled': True},
+            '8': {'name': 'STEEL RIGHT', 'enabled': True}
         }
     }
     

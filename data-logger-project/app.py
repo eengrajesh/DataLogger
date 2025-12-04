@@ -822,6 +822,42 @@ def api_version():
         "python_version": platform.python_version()
     })
 
+# ============= Channel Names API =============
+@app.route('/api/channels')
+def api_get_channels():
+    """Get all channel configurations with names"""
+    try:
+        channels = config.get('channels', {})
+        return jsonify(channels)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/channels/<int:channel>')
+def api_get_channel(channel):
+    """Get a specific channel configuration"""
+    try:
+        if 1 <= channel <= 8:
+            channel_config = config.get(f'channels.{channel}', {'name': f'CH{channel}', 'enabled': True})
+            return jsonify(channel_config)
+        else:
+            return jsonify({"error": "Invalid channel (1-8)"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/channels/<int:channel>/name', methods=['POST'])
+def api_set_channel_name(channel):
+    """Set a channel name"""
+    try:
+        if 1 <= channel <= 8:
+            data = request.get_json()
+            name = data.get('name', f'CH{channel}')
+            config.set(f'channels.{channel}.name', name)
+            return jsonify({"success": True, "channel": channel, "name": name})
+        else:
+            return jsonify({"error": "Invalid channel (1-8)"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     port = config.get('system.web_port', 8080)
     debug = config.get('system.debug_mode', False)
