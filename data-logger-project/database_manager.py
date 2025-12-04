@@ -35,7 +35,7 @@ class DatabaseInterface(ABC):
         pass
     
     @abstractmethod
-    def get_historical_data(self, hours: int = 24) -> List[Dict]:
+    def get_historical_data(self, hours: float = 24) -> List[Dict]:
         pass
     
     @abstractmethod
@@ -106,7 +106,7 @@ class SQLiteDatabase(DatabaseInterface):
         ''')
         return [dict(row) for row in cursor.fetchall()]
     
-    def get_historical_data(self, hours: int = 24) -> List[Dict]:
+    def get_historical_data(self, hours: float = 24) -> List[Dict]:
         cursor = self.conn.cursor()
         cutoff_time = datetime.now() - timedelta(hours=hours)
         cursor.execute('''
@@ -215,10 +215,10 @@ class PostgreSQLDatabase(DatabaseInterface):
             ''')
             return cursor.fetchall()
     
-    def get_historical_data(self, hours: int = 24) -> List[Dict]:
+    def get_historical_data(self, hours: float = 24) -> List[Dict]:
         with self.conn.cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute('''
-                SELECT * FROM readings 
+                SELECT * FROM readings
                 WHERE timestamp > NOW() - INTERVAL '%s hours'
                 ORDER BY timestamp DESC
             ''', (hours,))
@@ -298,7 +298,7 @@ class DualDatabaseManager:
             print(f"[DualDB] SQLite failed, trying PostgreSQL: {e}")
             return self.postgres_db.get_latest_readings()
 
-    def get_historical_data(self, hours: int = 24) -> List[Dict]:
+    def get_historical_data(self, hours: float = 24) -> List[Dict]:
         """Get historical data (from SQLite as primary)"""
         try:
             return self.sqlite_db.get_historical_data(hours)

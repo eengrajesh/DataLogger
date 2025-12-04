@@ -296,7 +296,7 @@ def api_latest_data():
 @app.route('/api/data/historical')
 def api_historical_data():
     try:
-        hours = request.args.get('hours', 24, type=int)
+        hours = request.args.get('hours', 24, type=float)
 
         print(f"[DEBUG] /api/data/historical called - Requesting last {hours} hours")
 
