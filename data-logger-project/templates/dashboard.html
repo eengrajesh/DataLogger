@@ -1026,8 +1026,16 @@
             }
         }
 
-        // Get channel display name
+        // Get channel display name with channel number in bracket
         function getChannelName(channel) {
+            if (channelNames[channel] && channelNames[channel].name) {
+                return `${channelNames[channel].name} (CH${channel})`;
+            }
+            return `CH${channel}`;
+        }
+
+        // Get short channel name (for compact displays)
+        function getChannelNameShort(channel) {
             if (channelNames[channel] && channelNames[channel].name) {
                 return channelNames[channel].name;
             }
@@ -1045,9 +1053,9 @@
             for (let i = 1; i <= 8; i++) {
                 const control = document.createElement('div');
                 control.className = 'sensor-control';
-                const name = getChannelName(i);
+                const shortName = getChannelNameShort(i);
                 control.innerHTML = `
-                    <span class="sensor-label" id="channel-name-${i}" title="CH${i}: ${name}">${name}</span>
+                    <span class="sensor-label" id="channel-name-${i}" title="${shortName} - Channel ${i}">${shortName} (CH${i})</span>
                     <div class="sensor-config">
                         <select class="interval-select" id="interval-${i}" onchange="updateInterval(${i})">
                             <option value="1">1s</option>
@@ -1784,7 +1792,7 @@
                     const min = Math.min(...data).toFixed(2);
                     const max = Math.max(...data).toFixed(2);
                     const latest = data[data.length - 1].toFixed(2);
-                    const chName = getChannelName(channel);
+                    const chName = getChannelNameShort(channel);
 
                     const statDiv = document.createElement('div');
                     statDiv.style.cssText = `
@@ -1795,8 +1803,8 @@
                         box-shadow: 0 2px 6px rgba(0,0,0,0.12);
                     `;
                     statDiv.innerHTML = `
-                        <div style="font-size: 12px; font-weight: 600; color: ${colors[channel-1]}; margin-bottom: 8px;" title="CH${channel}">
-                            ${chName}
+                        <div style="font-size: 12px; font-weight: 600; color: ${colors[channel-1]}; margin-bottom: 8px;" title="${chName} - Channel ${channel}">
+                            ${chName} (CH${channel})
                         </div>
                         <div style="background: linear-gradient(135deg, ${colors[channel-1]}15, ${colors[channel-1]}05); padding: 8px; border-radius: 6px; margin-bottom: 8px;">
                             <div style="font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Average</div>
@@ -1888,13 +1896,13 @@
                 // Only show data if channel has data AND sensor is enabled
                 if (chData.x && chData.x.length > 0 && isSensorEnabled) {
                     hasData = true;
-                    const chName = getChannelName(channel);
+                    const chName = getChannelNameShort(channel);
                     traces.push({
                         x: chData.x,
                         y: chData.y,
                         type: 'scatter',
                         mode: 'lines',
-                        name: chName,
+                        name: `${chName} (CH${channel})`,
                         line: {
                             color: colors[parseInt(channel) - 1],
                             width: 2,
