@@ -597,6 +597,160 @@ def api_textfiles_stats():
         "total_size": 0
     })
 
+@app.route('/api/textfiles/export_csv', methods=['POST'])
+def api_textfiles_export_csv():
+    """Export data from text files as CSV"""
+    try:
+        import csv
+        import io
+
+        data = request.get_json() or {}
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        channels = data.get('channels')  # List of channel numbers or None for all
+        include_raw = data.get('include_raw', False)
+
+        # Get data from database (text file logging may not be enabled)
+        # Parse date strings
+        start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00')) if start_date else datetime.now() - timedelta(hours=24)
+        end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00')) if end_date else datetime.now()
+
+        # Calculate hours difference
+        hours_diff = max(1, int((end_dt - start_dt).total_seconds() / 3600))
+
+        # Get historical data
+        all_data = db_manager.get_historical_data(hours=hours_diff)
+
+        # Filter by date range and channels
+        filtered_data = []
+        for reading in all_data:
+            reading_time = datetime.fromisoformat(reading['timestamp'].replace('Z', '+00:00')) if isinstance(reading['timestamp'], str) else reading['timestamp']
+
+            # Check date range
+            if start_dt <= reading_time <= end_dt:
+                # Check channel filter
+                if channels is None or reading['thermocouple_id'] in channels:
+                    filtered_data.append(reading)
+
+        if not filtered_data:
+            return jsonify({"error": "No data found for the specified date range"}), 404
+
+        # Create CSV in memory
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        # Write header
+        header = ['Timestamp', 'Channel', 'Channel Name', 'Temperature (°C)']
+        if include_raw:
+            header.append('Raw Value')
+        writer.writerow(header)
+
+        # Get channel names
+        channel_names_config = config.get('channels', {})
+
+        # Write data rows
+        for reading in filtered_data:
+            ch_id = reading['thermocouple_id']
+            ch_name = channel_names_config.get(str(ch_id), {}).get('name', f'CH{ch_id}')
+
+            row = [
+                reading['timestamp'],
+                f'CH{ch_id}',
+                ch_name,
+                reading['temperature']
+            ]
+            if include_raw:
+                row.append(reading.get('raw_value', reading['temperature']))
+            writer.writerow(row)
+
+        # Prepare response
+        output.seek(0)
+
+        from flask import Response
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename=temperature_data_{start_date}_{end_date}.csv'
+            }
+        )
+
+    except Exception as e:
+        print(f"[ERROR] CSV export failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/data/export/<format>')
+def api_data_export(format):
+    """Export data from database as CSV or JSON"""
+    try:
+        import csv
+        import io
+
+        # Get parameters
+        start_date = request.args.get('start')
+        end_date = request.args.get('end')
+        hours = request.args.get('hours', 24, type=int)
+
+        # Calculate time range
+        if start_date and end_date:
+            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00').replace('T', ' ').split('+')[0])
+            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00').replace('T', ' ').split('+')[0])
+            hours = max(1, int((end_dt - start_dt).total_seconds() / 3600))
+
+        # Get data from database
+        data = db_manager.get_historical_data(hours=hours)
+
+        if not data:
+            return jsonify({"error": "No data found"}), 404
+
+        # Get channel names
+        channel_names_config = config.get('channels', {})
+
+        if format.lower() == 'json':
+            # Add channel names to data
+            for reading in data:
+                ch_id = reading['thermocouple_id']
+                reading['channel_name'] = channel_names_config.get(str(ch_id), {}).get('name', f'CH{ch_id}')
+
+            return jsonify(data)
+
+        elif format.lower() == 'csv':
+            # Create CSV in memory
+            output = io.StringIO()
+            writer = csv.writer(output)
+
+            # Write header
+            writer.writerow(['Timestamp', 'Channel', 'Channel Name', 'Temperature (°C)'])
+
+            # Write data rows
+            for reading in data:
+                ch_id = reading['thermocouple_id']
+                ch_name = channel_names_config.get(str(ch_id), {}).get('name', f'CH{ch_id}')
+                writer.writerow([
+                    reading['timestamp'],
+                    f'CH{ch_id}',
+                    ch_name,
+                    reading['temperature']
+                ])
+
+            output.seek(0)
+
+            from flask import Response
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            return Response(
+                output.getvalue(),
+                mimetype='text/csv',
+                headers={
+                    'Content-Disposition': f'attachment; filename=temperature_export_{timestamp}.csv'
+                }
+            )
+        else:
+            return jsonify({"error": f"Unsupported format: {format}. Use 'csv' or 'json'"}), 400
+
+    except Exception as e:
+        print(f"[ERROR] Data export failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/notifications/status')
 def api_notifications_status():
     """Notification status endpoint"""
