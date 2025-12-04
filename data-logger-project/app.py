@@ -106,6 +106,22 @@ def api_board_info():
     """API endpoint to get the board info."""
     return jsonify(get_board_info())
 
+@app.route('/api/status')
+def api_status():
+    """API endpoint for overall system status - used by dashboard on page load."""
+    try:
+        from data_logger import is_logging
+        logging_active = is_logging()
+    except:
+        logging_active = False
+
+    board_info = get_board_info()
+
+    return jsonify({
+        "board_info": board_info,
+        "logging_active": logging_active
+    })
+
 @app.route('/api/storage_status')
 def api_storage_status():
     """API endpoint to get the storage status."""
