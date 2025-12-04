@@ -111,6 +111,56 @@ def api_storage_status():
     """API endpoint to get the storage status."""
     return jsonify(get_storage_status())
 
+@app.route('/api/storage_info')
+def api_storage_info():
+    """API endpoint to show where data is stored - helps users find their files."""
+    import os
+    from text_file_logger import text_file_logger
+
+    # Get absolute paths
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    db_path = os.path.join(base_dir, 'datalogger.db')
+    raw_path = os.path.join(base_dir, 'data', 'raw')
+    daily_path = os.path.join(base_dir, 'data', 'daily')
+
+    # Count files
+    raw_files = len(list(text_file_logger.raw_path.glob('*.txt'))) if text_file_logger.raw_path.exists() else 0
+    daily_files = len(list(text_file_logger.daily_path.glob('*.txt'))) if text_file_logger.daily_path.exists() else 0
+
+    # Get database size
+    db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+    db_size_mb = round(db_size / (1024 * 1024), 2)
+
+    # Get record count from database
+    try:
+        record_count = len(db_manager.get_historical_data(hours=24*365*10))
+    except:
+        record_count = 0
+
+    return jsonify({
+        "database": {
+            "path": db_path,
+            "size_bytes": db_size,
+            "size_mb": db_size_mb,
+            "record_count": record_count,
+            "description": "Primary storage - All temperature readings"
+        },
+        "text_files": {
+            "raw_path": str(raw_path),
+            "daily_path": str(daily_path),
+            "raw_file_count": raw_files,
+            "daily_file_count": daily_files,
+            "description": "Backup storage - Hourly and daily CSV files"
+        },
+        "how_data_is_saved": {
+            "step1": "Temperature read from thermocouple sensor",
+            "step2": "Calibration correction applied",
+            "step3": "Saved to SQLite database (datalogger.db)",
+            "step4": "Saved to text file (data/raw/YYYY-MM-DD_HH.txt)",
+            "interval": "Every 5 seconds per channel"
+        }
+    })
+
 @app.route('/api/cpu_temp')
 def api_cpu_temp():
     """API endpoint to get the CPU temperature."""
