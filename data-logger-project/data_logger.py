@@ -122,10 +122,9 @@ def log_temperatures():
                     print("[DataLogger] Performing periodic maintenance...")
                     # Consolidate yesterday's data
                     text_file_logger.consolidate_daily_file()
-                    # Clean up old files
-                    text_file_logger.cleanup_old_files()
-                    # Compress old files
-                    text_file_logger.compress_old_files()
+                    # NOTE: Cleanup and compression disabled - keeping all data
+                    # text_file_logger.cleanup_old_files()  # DISABLED - keep all data
+                    # text_file_logger.compress_old_files()  # DISABLED - keep all data
                     last_cleanup_time = current_time
                 except Exception as e:
                     print(f"[DataLogger] Maintenance error: {e}")

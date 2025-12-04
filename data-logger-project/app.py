@@ -144,17 +144,25 @@ def api_download_data(file_format):
                 headers={"Content-Disposition": "attachment;filename=error.txt"}
             )
 
-        if file_format == 'json':
-            # Convert timestamp to ISO format if it's not already a string
-            for reading in readings:
-                if isinstance(reading.get('timestamp'), str):
-                    pass  # Already a string
-                elif hasattr(reading.get('timestamp'), 'isoformat'):
-                    reading['timestamp'] = reading['timestamp'].isoformat()
+        # Convert all readings to ensure proper formatting
+        formatted_readings = []
+        for reading in readings:
+            formatted_reading = {}
+            for key, value in reading.items():
+                if key == 'timestamp':
+                    # Handle timestamp conversion
+                    if isinstance(value, str):
+                        formatted_reading[key] = value
+                    elif hasattr(value, 'isoformat'):
+                        formatted_reading[key] = value.isoformat()
+                    else:
+                        formatted_reading[key] = str(value)
                 else:
-                    reading['timestamp'] = str(reading.get('timestamp'))
-            
-            output = json.dumps(readings, indent=4)
+                    formatted_reading[key] = value
+            formatted_readings.append(formatted_reading)
+
+        if file_format == 'json':
+            output = json.dumps(formatted_readings, indent=4)
             return Response(
                 output,
                 mimetype="application/json",
@@ -162,13 +170,16 @@ def api_download_data(file_format):
             )
         elif file_format == 'csv':
             output = io.StringIO()
-            writer = csv.writer(output)
-            
-            if readings:
-                writer.writerow(readings[0].keys())
-            
-            for reading in readings:
-                writer.writerow(reading.values())
+
+            if formatted_readings:
+                # Write header
+                fieldnames = ['id', 'timestamp', 'thermocouple_id', 'temperature']
+                writer = csv.DictWriter(output, fieldnames=fieldnames)
+                writer.writeheader()
+
+                # Write data rows
+                for reading in formatted_readings:
+                    writer.writerow(reading)
             
             return Response(
                 output.getvalue(),
