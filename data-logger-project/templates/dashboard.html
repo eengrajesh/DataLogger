@@ -740,12 +740,12 @@
                 </div>
 
                 <div class="control-section">
-                    <h3><i class="fas fa-sliders-h" style="margin-right: 8px; color: var(--primary);"></i>Channel Calibration</h3>
+                    <h3><i class="fas fa-sliders-h" style="margin-right: 8px; color: var(--primary);"></i>Two-Point Calibration</h3>
                     <div class="calibration-section" style="background: var(--light); padding: 15px; border-radius: 8px;">
                         <p style="font-size: 11px; color: #6b7280; margin-bottom: 12px;">
-                            Adjust calibration factors for each channel (multiplies raw reading)
+                            Enter sensor readings at 0°C (ice bath) and 100°C (boiling water) to auto-calculate calibration
                         </p>
-                        <div id="calibration-controls" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+                        <div id="calibration-controls" style="display: flex; flex-direction: column; gap: 10px;">
                             <!-- Calibration inputs will be generated here -->
                         </div>
                     </div>
@@ -1098,14 +1098,14 @@
             initializeCalibrationControls();
         }
 
-        // Initialize calibration controls
+        // Initialize calibration controls with two-point calibration
         async function initializeCalibrationControls() {
             const container = document.getElementById('calibration-controls');
             if (!container) return;
 
             container.innerHTML = '';
 
-            // Fetch current calibration factors
+            // Fetch current calibration data
             try {
                 const response = await fetch('/api/calibration');
                 if (response.ok) {
@@ -1116,67 +1116,167 @@
             }
 
             for (let i = 1; i <= 8; i++) {
-                const factor = calibrationFactors[i] || calibrationFactors[String(i)] || 1.0;
+                const calData = calibrationFactors[i] || calibrationFactors[String(i)] || {};
+                const iceReading = calData.ice_reading || '';
+                const boilReading = calData.boil_reading || '';
+                const slope = calData.slope || 1.0;
+                const offset = calData.offset || 0.0;
+                const method = calData.calibration_method || 'none';
+                const chName = getChannelNameShort(i);
+
                 const calibDiv = document.createElement('div');
-                calibDiv.style.cssText = 'display: flex; align-items: center; gap: 6px; background: white; padding: 8px; border-radius: 6px;';
+                calibDiv.style.cssText = 'background: white; padding: 10px; border-radius: 8px; border: 1px solid #e5e7eb;';
                 calibDiv.innerHTML = `
-                    <span style="font-size: 12px; font-weight: 600; color: var(--primary); min-width: 35px;">CH${i}</span>
-                    <input type="number"
-                           id="calibration-${i}"
-                           value="${factor}"
-                           step="0.01"
-                           min="0.1"
-                           max="10"
-                           style="width: 65px; padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px; text-align: center;"
-                           onchange="updateCalibration(${i})"
-                           title="Calibration factor for Channel ${i}">
-                    <button onclick="resetCalibration(${i})"
-                            style="background: #6b7280; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;"
-                            title="Reset to 1.0">
-                        <i class="fas fa-undo"></i>
-                    </button>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 13px; font-weight: 600; color: var(--primary);">${chName} (CH${i})</span>
+                        <span id="cal-status-${i}" style="font-size: 10px; padding: 2px 6px; border-radius: 10px; background: ${method === 'two_point' ? '#dcfce7' : '#f3f4f6'}; color: ${method === 'two_point' ? '#15803d' : '#6b7280'};">
+                            ${method === 'two_point' ? 'Calibrated' : method === 'simple' ? 'Simple' : 'Not Set'}
+                        </span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">
+                        <div>
+                            <label style="font-size: 10px; color: #6b7280; display: block; margin-bottom: 2px;">Ice (0°C) Reading</label>
+                            <input type="number"
+                                   id="ice-${i}"
+                                   value="${iceReading}"
+                                   step="0.1"
+                                   placeholder="e.g. 2.5"
+                                   style="width: 100%; padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 11px;"
+                                   title="Raw sensor reading when in ice bath (0°C)">
+                        </div>
+                        <div>
+                            <label style="font-size: 10px; color: #6b7280; display: block; margin-bottom: 2px;">Boil (100°C) Reading</label>
+                            <input type="number"
+                                   id="boil-${i}"
+                                   value="${boilReading}"
+                                   step="0.1"
+                                   placeholder="e.g. 98.5"
+                                   style="width: 100%; padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 11px;"
+                                   title="Raw sensor reading when in boiling water (~100°C)">
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 6px;">
+                        <button onclick="applyTwoPointCalibration(${i})"
+                                style="flex: 1; background: var(--primary); color: white; border: none; padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 500;">
+                            <i class="fas fa-calculator"></i> Calculate
+                        </button>
+                        <button onclick="resetCalibration(${i})"
+                                style="background: #6b7280; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;"
+                                title="Reset to no calibration">
+                            <i class="fas fa-undo"></i>
+                        </button>
+                    </div>
+                    <div id="cal-result-${i}" style="margin-top: 6px; font-size: 10px; color: #6b7280; display: ${method === 'two_point' ? 'block' : 'none'};">
+                        <span style="background: #f0f9ff; padding: 2px 6px; border-radius: 4px;">
+                            y = ${slope.toFixed(4)}x + ${offset.toFixed(2)}
+                        </span>
+                    </div>
                 `;
                 container.appendChild(calibDiv);
             }
         }
 
-        // Update calibration factor for a channel
-        async function updateCalibration(channel) {
-            const input = document.getElementById(`calibration-${channel}`);
-            const factor = parseFloat(input.value);
+        // Apply two-point calibration for a channel
+        async function applyTwoPointCalibration(channel) {
+            const iceInput = document.getElementById(`ice-${channel}`);
+            const boilInput = document.getElementById(`boil-${channel}`);
+            const iceReading = parseFloat(iceInput.value);
+            const boilReading = parseFloat(boilInput.value);
 
-            if (factor <= 0 || factor > 10) {
-                alert('Calibration factor must be between 0.1 and 10');
-                input.value = calibrationFactors[channel] || 1.0;
+            // Validate inputs
+            if (isNaN(iceReading) || isNaN(boilReading)) {
+                alert('Please enter both ice bath and boiling water readings');
+                return;
+            }
+
+            if (iceReading === boilReading) {
+                alert('Ice and boiling readings cannot be the same');
                 return;
             }
 
             try {
-                const response = await fetch(`/api/calibration/${channel}`, {
+                const response = await fetch(`/api/calibration/${channel}/two_point`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ factor: factor })
+                    body: JSON.stringify({
+                        ice_reading: iceReading,
+                        boil_reading: boilReading,
+                        actual_ice: 0.0,
+                        actual_boil: 100.0
+                    })
                 });
 
+                const result = await response.json();
+
                 if (response.ok) {
-                    calibrationFactors[channel] = factor;
-                    console.log(`Calibration for CH${channel} set to ${factor}`);
+                    // Update status indicator
+                    const statusEl = document.getElementById(`cal-status-${channel}`);
+                    statusEl.textContent = 'Calibrated';
+                    statusEl.style.background = '#dcfce7';
+                    statusEl.style.color = '#15803d';
+
+                    // Show calibration result
+                    const resultEl = document.getElementById(`cal-result-${channel}`);
+                    resultEl.innerHTML = `
+                        <span style="background: #f0f9ff; padding: 2px 6px; border-radius: 4px;">
+                            y = ${result.slope.toFixed(4)}x + ${result.offset.toFixed(2)}
+                        </span>
+                    `;
+                    resultEl.style.display = 'block';
+
+                    // Store calibration data
+                    calibrationFactors[channel] = {
+                        slope: result.slope,
+                        offset: result.offset,
+                        ice_reading: iceReading,
+                        boil_reading: boilReading,
+                        calibration_method: 'two_point'
+                    };
+
+                    console.log(`CH${channel} calibrated: slope=${result.slope}, offset=${result.offset}`);
                 } else {
-                    const error = await response.json();
-                    alert(`Failed to update calibration: ${error.error}`);
-                    input.value = calibrationFactors[channel] || 1.0;
+                    alert(`Calibration failed: ${result.error}`);
                 }
             } catch (error) {
-                console.error('Error updating calibration:', error);
+                console.error('Error applying calibration:', error);
                 alert(`Error: ${error.message}`);
             }
         }
 
-        // Reset calibration factor to 1.0
+        // Reset calibration for a channel
         async function resetCalibration(channel) {
-            const input = document.getElementById(`calibration-${channel}`);
-            input.value = 1.0;
-            await updateCalibration(channel);
+            try {
+                const response = await fetch(`/api/calibration/${channel}/reset`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (response.ok) {
+                    // Clear inputs
+                    document.getElementById(`ice-${channel}`).value = '';
+                    document.getElementById(`boil-${channel}`).value = '';
+
+                    // Update status indicator
+                    const statusEl = document.getElementById(`cal-status-${channel}`);
+                    statusEl.textContent = 'Not Set';
+                    statusEl.style.background = '#f3f4f6';
+                    statusEl.style.color = '#6b7280';
+
+                    // Hide result
+                    document.getElementById(`cal-result-${channel}`).style.display = 'none';
+
+                    // Clear stored data
+                    calibrationFactors[channel] = {};
+
+                    console.log(`CH${channel} calibration reset`);
+                } else {
+                    const error = await response.json();
+                    alert(`Reset failed: ${error.error}`);
+                }
+            } catch (error) {
+                console.error('Error resetting calibration:', error);
+                alert(`Error: ${error.message}`);
+            }
         }
 
         // Initialize Plotly graph - starts empty until data is available

@@ -24,7 +24,13 @@ from database_manager import DatabaseManager
 from storage_manager import StorageManager
 from text_file_logger import text_file_logger
 from notification_system import notification_system, AlertLevel
-from calibration import get_calibration_factors, set_calibration_factor
+from calibration import (
+    get_calibration_factors,
+    set_calibration_factor,
+    set_two_point_calibration,
+    get_channel_calibration,
+    reset_channel_calibration
+)
 import sys
 import os
 import json
@@ -1016,7 +1022,7 @@ def api_set_channel_name(channel):
 # ============= Calibration API =============
 @app.route('/api/calibration')
 def api_get_calibration():
-    """Get all calibration factors"""
+    """Get all calibration data"""
     try:
         factors = get_calibration_factors()
         return jsonify(factors)
@@ -1025,12 +1031,12 @@ def api_get_calibration():
 
 @app.route('/api/calibration/<int:channel>')
 def api_get_calibration_channel(channel):
-    """Get calibration factor for a specific channel"""
+    """Get full calibration data for a specific channel"""
     try:
         if 1 <= channel <= 8:
-            factors = get_calibration_factors()
-            factor = factors.get(str(channel), 1.0)
-            return jsonify({"channel": channel, "factor": factor})
+            cal_data = get_channel_calibration(channel)
+            cal_data["channel"] = channel
+            return jsonify(cal_data)
         else:
             return jsonify({"error": "Invalid channel (1-8)"}), 400
     except Exception as e:
@@ -1038,18 +1044,112 @@ def api_get_calibration_channel(channel):
 
 @app.route('/api/calibration/<int:channel>', methods=['POST'])
 def api_set_calibration(channel):
-    """Set calibration factor for a specific channel"""
+    """Set calibration for a specific channel (simple factor or two-point)"""
     try:
         if 1 <= channel <= 8:
             data = request.get_json()
-            factor = data.get('factor', 1.0)
-            # Validate factor is a reasonable number
-            if not isinstance(factor, (int, float)) or factor <= 0 or factor > 10:
-                return jsonify({"error": "Factor must be a number between 0 and 10"}), 400
-            set_calibration_factor(channel, float(factor))
-            return jsonify({"success": True, "channel": channel, "factor": factor})
+
+            # Check if this is a two-point calibration request
+            if 'ice_reading' in data and 'boil_reading' in data:
+                ice_reading = float(data.get('ice_reading'))
+                boil_reading = float(data.get('boil_reading'))
+                actual_ice = float(data.get('actual_ice', 0.0))
+                actual_boil = float(data.get('actual_boil', 100.0))
+
+                # Validate readings
+                if ice_reading == boil_reading:
+                    return jsonify({"error": "Ice and boiling readings cannot be the same"}), 400
+
+                result = set_two_point_calibration(
+                    channel, ice_reading, boil_reading, actual_ice, actual_boil
+                )
+                return jsonify({
+                    "success": True,
+                    "channel": channel,
+                    "calibration_method": "two_point",
+                    "slope": result["slope"],
+                    "offset": result["offset"],
+                    "factor": result["factor"]
+                })
+            else:
+                # Simple factor calibration
+                factor = data.get('factor', 1.0)
+                # Validate factor is a reasonable number
+                if not isinstance(factor, (int, float)) or factor <= 0 or factor > 10:
+                    return jsonify({"error": "Factor must be a number between 0 and 10"}), 400
+                set_calibration_factor(channel, float(factor))
+                return jsonify({
+                    "success": True,
+                    "channel": channel,
+                    "calibration_method": "simple",
+                    "factor": factor
+                })
         else:
             return jsonify({"error": "Invalid channel (1-8)"}), 400
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/calibration/<int:channel>/reset', methods=['POST'])
+def api_reset_calibration(channel):
+    """Reset calibration for a specific channel to defaults"""
+    try:
+        if 1 <= channel <= 8:
+            result = reset_channel_calibration(channel)
+            return jsonify({
+                "success": True,
+                "channel": channel,
+                "calibration": result
+            })
+        else:
+            return jsonify({"error": "Invalid channel (1-8)"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/calibration/<int:channel>/two_point', methods=['POST'])
+def api_set_two_point_calibration(channel):
+    """Set two-point linear calibration for a specific channel"""
+    try:
+        if 1 <= channel <= 8:
+            data = request.get_json()
+
+            ice_reading = data.get('ice_reading')
+            boil_reading = data.get('boil_reading')
+            actual_ice = float(data.get('actual_ice', 0.0))
+            actual_boil = float(data.get('actual_boil', 100.0))
+
+            # Validate required fields
+            if ice_reading is None or boil_reading is None:
+                return jsonify({"error": "Both ice_reading and boil_reading are required"}), 400
+
+            ice_reading = float(ice_reading)
+            boil_reading = float(boil_reading)
+
+            if ice_reading == boil_reading:
+                return jsonify({"error": "Ice and boiling readings cannot be the same"}), 400
+
+            result = set_two_point_calibration(
+                channel, ice_reading, boil_reading, actual_ice, actual_boil
+            )
+
+            return jsonify({
+                "success": True,
+                "channel": channel,
+                "calibration_method": "two_point",
+                "ice_reading": ice_reading,
+                "boil_reading": boil_reading,
+                "actual_ice": actual_ice,
+                "actual_boil": actual_boil,
+                "slope": result["slope"],
+                "offset": result["offset"],
+                "factor": result["factor"],
+                "formula": f"corrected = {result['slope']:.6f} * raw + {result['offset']:.4f}"
+            })
+        else:
+            return jsonify({"error": "Invalid channel (1-8)"}), 400
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
