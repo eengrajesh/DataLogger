@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     const SENSOR_TOGGLES_CONTAINER = document.getElementById('sensor-toggles-container');
     const SENSOR_TILES_CONTAINER = document.getElementById('sensor-tiles-container');
+    const CALIBRATION_GRID = document.getElementById('calibration-grid');
     const AVG_TEMP_CALLOUT = document.querySelector('#average-temp-callout p');
     const AVG_TEMP_BAR_CHART_CANVAS = document.getElementById('average-temp-bar-chart');
     const HISTORICAL_CHART_CANVAS = document.getElementById('temperature-chart');
@@ -15,11 +16,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const LOGGING_STATUS_ELEMENT = document.getElementById('logging-status');
     const STORAGE_STATUS_ELEMENT = document.querySelector('#storage-status span');
     const CPU_TEMP_STATUS_ELEMENT = document.querySelector('#cpu-temp-status span');
-    const CORRECTION_FACTOR_INPUT = document.getElementById('correction-factor');
 
     const NUMBER_OF_CHANNELS = 8;
     let historicalChart, avgTempBarChart;
     let activeSensors = {};
+    let calibrationFactors = {};
 
     function initializeUI() {
         for (let i = 1; i <= NUMBER_OF_CHANNELS; i++) {
@@ -58,6 +59,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 <p class="avg-temp">Avg: --.- °C</p>
             `;
             SENSOR_TILES_CONTAINER.appendChild(tile);
+
+            // Create calibration input for each channel
+            if (CALIBRATION_GRID) {
+                const calibrationItem = document.createElement('div');
+                calibrationItem.className = 'calibration-item';
+                calibrationItem.innerHTML = `
+                    <label for="calibration-${i}">CH${i}</label>
+                    <input type="number"
+                           id="calibration-${i}"
+                           data-channel="${i}"
+                           class="calibration-input"
+                           value="1.0"
+                           step="0.01"
+                           min="0.1"
+                           max="10"
+                           title="Calibration factor for Channel ${i}">
+                    <button class="calibration-reset-btn" data-channel="${i}" title="Reset to 1.0">
+                        <i class="fas fa-undo"></i>
+                    </button>
+                `;
+                CALIBRATION_GRID.appendChild(calibrationItem);
+            }
         }
 
         initializeCharts();
@@ -157,11 +180,35 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.href = '/api/data/download/csv';
         });
 
-        CORRECTION_FACTOR_INPUT.addEventListener('change', (event) => {
-            const channel = 1; // Assuming a single correction factor for now, will need to update for per-channel
-            const factor = parseFloat(event.target.value);
-            postData(`/api/calibration/${channel}`, { factor });
-        });
+        // Per-channel calibration event listeners
+        if (CALIBRATION_GRID) {
+            CALIBRATION_GRID.addEventListener('change', (event) => {
+                if (event.target.classList.contains('calibration-input')) {
+                    const channel = parseInt(event.target.dataset.channel);
+                    const factor = parseFloat(event.target.value);
+                    if (factor > 0 && factor <= 10) {
+                        postData(`/api/calibration/${channel}`, { factor });
+                        calibrationFactors[channel] = factor;
+                    } else {
+                        alert('Calibration factor must be between 0.1 and 10');
+                        event.target.value = calibrationFactors[channel] || 1.0;
+                    }
+                }
+            });
+
+            CALIBRATION_GRID.addEventListener('click', (event) => {
+                const resetBtn = event.target.closest('.calibration-reset-btn');
+                if (resetBtn) {
+                    const channel = parseInt(resetBtn.dataset.channel);
+                    const input = document.getElementById(`calibration-${channel}`);
+                    if (input) {
+                        input.value = 1.0;
+                        postData(`/api/calibration/${channel}`, { factor: 1.0 });
+                        calibrationFactors[channel] = 1.0;
+                    }
+                }
+            });
+        }
     }
 
     async function postData(url, body = {}) {
@@ -211,7 +258,7 @@ document.addEventListener('DOMContentLoaded', function() {
             updateHistoricalChart(historical);
             updateSensorToggles(sensorIntervals);
             updateHeaderStatus(storageStatus, boardInfo, cpuTemp);
-            updateCalibrationFactor(calibrationFactors);
+            updateCalibrationFactors(calibrationFactors);
 
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -337,10 +384,15 @@ document.addEventListener('DOMContentLoaded', function() {
         historicalChart.update();
     }
 
-    function updateCalibrationFactor(factors) {
-        const channel = 1; // Assuming a single correction factor for now
-        if (factors && factors[channel]) {
-            CORRECTION_FACTOR_INPUT.value = factors[channel];
+    function updateCalibrationFactors(factors) {
+        calibrationFactors = factors || {};
+        for (let i = 1; i <= NUMBER_OF_CHANNELS; i++) {
+            const input = document.getElementById(`calibration-${i}`);
+            if (input) {
+                const factor = factors[i] || factors[String(i)] || 1.0;
+                input.value = factor;
+                calibrationFactors[i] = factor;
+            }
         }
     }
 

@@ -24,6 +24,7 @@ from database_manager import DatabaseManager
 from storage_manager import StorageManager
 from text_file_logger import text_file_logger
 from notification_system import notification_system, AlertLevel
+from calibration import get_calibration_factors, set_calibration_factor
 import sys
 import os
 import json
@@ -1011,6 +1012,117 @@ def api_set_channel_name(channel):
             return jsonify({"error": "Invalid channel (1-8)"}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# ============= Calibration API =============
+@app.route('/api/calibration')
+def api_get_calibration():
+    """Get all calibration factors"""
+    try:
+        factors = get_calibration_factors()
+        return jsonify(factors)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/calibration/<int:channel>')
+def api_get_calibration_channel(channel):
+    """Get calibration factor for a specific channel"""
+    try:
+        if 1 <= channel <= 8:
+            factors = get_calibration_factors()
+            factor = factors.get(str(channel), 1.0)
+            return jsonify({"channel": channel, "factor": factor})
+        else:
+            return jsonify({"error": "Invalid channel (1-8)"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/calibration/<int:channel>', methods=['POST'])
+def api_set_calibration(channel):
+    """Set calibration factor for a specific channel"""
+    try:
+        if 1 <= channel <= 8:
+            data = request.get_json()
+            factor = data.get('factor', 1.0)
+            # Validate factor is a reasonable number
+            if not isinstance(factor, (int, float)) or factor <= 0 or factor > 10:
+                return jsonify({"error": "Factor must be a number between 0 and 10"}), 400
+            set_calibration_factor(channel, float(factor))
+            return jsonify({"success": True, "channel": channel, "factor": factor})
+        else:
+            return jsonify({"error": "Invalid channel (1-8)"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ============= Sensor Status and Interval APIs =============
+@app.route('/api/sensor_status')
+def api_get_sensor_status():
+    """Get active status of all sensors"""
+    try:
+        if DATA_LOGGER_AVAILABLE:
+            return jsonify(get_sensor_status())
+        else:
+            # Return default all-active for simulated mode
+            return jsonify({i: True for i in range(1, 9)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/sensor_status/<int:channel>', methods=['POST'])
+def api_set_sensor_status(channel):
+    """Enable or disable a specific sensor channel"""
+    try:
+        if 1 <= channel <= 8:
+            data = request.get_json()
+            status = data.get('status', True)
+            if DATA_LOGGER_AVAILABLE:
+                result = set_sensor_status(channel, status)
+                return jsonify({"success": result, "channel": channel, "status": status})
+            else:
+                return jsonify({"success": True, "channel": channel, "status": status, "simulated": True})
+        else:
+            return jsonify({"error": "Invalid channel (1-8)"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/sensor_intervals')
+def api_get_sensor_intervals():
+    """Get sampling intervals for all sensors"""
+    try:
+        if DATA_LOGGER_AVAILABLE:
+            return jsonify(get_sensor_intervals())
+        else:
+            # Return default 5-second intervals for simulated mode
+            return jsonify({i: 5 for i in range(1, 9)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/sensor_interval/<int:channel>', methods=['POST'])
+def api_set_sensor_interval(channel):
+    """Set sampling interval for a specific channel"""
+    try:
+        if 1 <= channel <= 8:
+            data = request.get_json()
+            interval = data.get('interval', 5)
+            if DATA_LOGGER_AVAILABLE:
+                result = set_sensor_interval(channel, interval)
+                return jsonify({"success": result, "channel": channel, "interval": interval})
+            else:
+                return jsonify({"success": True, "channel": channel, "interval": interval, "simulated": True})
+        else:
+            return jsonify({"error": "Invalid channel (1-8)"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/cpu_temp')
+def api_cpu_temp_legacy():
+    """Legacy CPU temp endpoint for dashboard compatibility"""
+    try:
+        if DATA_LOGGER_AVAILABLE:
+            result = get_cpu_temperature()
+            return jsonify(result)
+        else:
+            return jsonify({"cpu_temp": 45.5, "simulated": True})
+    except Exception as e:
+        return jsonify({"cpu_temp": -1, "error": str(e)})
 
 if __name__ == '__main__':
     port = config.get('system.web_port', 8080)
