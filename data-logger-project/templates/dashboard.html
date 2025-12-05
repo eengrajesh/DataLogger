@@ -740,6 +740,18 @@
                 </div>
 
                 <div class="control-section">
+                    <h3><i class="fas fa-sliders-h" style="margin-right: 8px; color: var(--primary);"></i>Channel Calibration</h3>
+                    <div class="calibration-section" style="background: var(--light); padding: 15px; border-radius: 8px;">
+                        <p style="font-size: 11px; color: #6b7280; margin-bottom: 12px;">
+                            Adjust calibration factors for each channel (multiplies raw reading)
+                        </p>
+                        <div id="calibration-controls" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+                            <!-- Calibration inputs will be generated here -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-section">
                     <h3>Database Configuration</h3>
                     <div class="database-config">
                         <div class="db-option">
@@ -1045,6 +1057,9 @@
             return `CH${channel}`;
         }
 
+        // Calibration factors storage
+        let calibrationFactors = {};
+
         // Initialize sensor controls
         async function initializeSensorControls() {
             // Fetch channel names first
@@ -1078,6 +1093,90 @@
                 `;
                 container.appendChild(control);
             }
+
+            // Initialize calibration controls
+            initializeCalibrationControls();
+        }
+
+        // Initialize calibration controls
+        async function initializeCalibrationControls() {
+            const container = document.getElementById('calibration-controls');
+            if (!container) return;
+
+            container.innerHTML = '';
+
+            // Fetch current calibration factors
+            try {
+                const response = await fetch('/api/calibration');
+                if (response.ok) {
+                    calibrationFactors = await response.json();
+                }
+            } catch (error) {
+                console.error('Error fetching calibration factors:', error);
+            }
+
+            for (let i = 1; i <= 8; i++) {
+                const factor = calibrationFactors[i] || calibrationFactors[String(i)] || 1.0;
+                const calibDiv = document.createElement('div');
+                calibDiv.style.cssText = 'display: flex; align-items: center; gap: 6px; background: white; padding: 8px; border-radius: 6px;';
+                calibDiv.innerHTML = `
+                    <span style="font-size: 12px; font-weight: 600; color: var(--primary); min-width: 35px;">CH${i}</span>
+                    <input type="number"
+                           id="calibration-${i}"
+                           value="${factor}"
+                           step="0.01"
+                           min="0.1"
+                           max="10"
+                           style="width: 65px; padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px; text-align: center;"
+                           onchange="updateCalibration(${i})"
+                           title="Calibration factor for Channel ${i}">
+                    <button onclick="resetCalibration(${i})"
+                            style="background: #6b7280; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;"
+                            title="Reset to 1.0">
+                        <i class="fas fa-undo"></i>
+                    </button>
+                `;
+                container.appendChild(calibDiv);
+            }
+        }
+
+        // Update calibration factor for a channel
+        async function updateCalibration(channel) {
+            const input = document.getElementById(`calibration-${channel}`);
+            const factor = parseFloat(input.value);
+
+            if (factor <= 0 || factor > 10) {
+                alert('Calibration factor must be between 0.1 and 10');
+                input.value = calibrationFactors[channel] || 1.0;
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/calibration/${channel}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ factor: factor })
+                });
+
+                if (response.ok) {
+                    calibrationFactors[channel] = factor;
+                    console.log(`Calibration for CH${channel} set to ${factor}`);
+                } else {
+                    const error = await response.json();
+                    alert(`Failed to update calibration: ${error.error}`);
+                    input.value = calibrationFactors[channel] || 1.0;
+                }
+            } catch (error) {
+                console.error('Error updating calibration:', error);
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Reset calibration factor to 1.0
+        async function resetCalibration(channel) {
+            const input = document.getElementById(`calibration-${channel}`);
+            input.value = 1.0;
+            await updateCalibration(channel);
         }
 
         // Initialize Plotly graph - starts empty until data is available
