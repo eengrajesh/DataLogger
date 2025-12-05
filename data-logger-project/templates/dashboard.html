@@ -743,8 +743,18 @@
                     <h3><i class="fas fa-sliders-h" style="margin-right: 8px; color: var(--primary);"></i>Two-Point Calibration</h3>
                     <div class="calibration-section" style="background: var(--light); padding: 15px; border-radius: 8px;">
                         <p style="font-size: 11px; color: #6b7280; margin-bottom: 12px;">
-                            Enter sensor readings at 0°C (ice bath) and 100°C (boiling water) to auto-calculate calibration
+                            Enter sensor readings and actual temperatures (measured with reference thermometer/gun)
                         </p>
+                        <div style="display: flex; gap: 6px; margin-bottom: 12px;">
+                            <button onclick="downloadCalibration()"
+                                    style="flex: 1; background: #059669; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                            <label style="flex: 1; background: #7c3aed; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-size: 11px; text-align: center;">
+                                <i class="fas fa-upload"></i> Upload
+                                <input type="file" id="calibration-upload" accept=".json" style="display: none;" onchange="uploadCalibration(event)">
+                            </label>
+                        </div>
                         <div id="calibration-controls" style="display: flex; flex-direction: column; gap: 10px;">
                             <!-- Calibration inputs will be generated here -->
                         </div>
@@ -1117,8 +1127,10 @@
 
             for (let i = 1; i <= 8; i++) {
                 const calData = calibrationFactors[i] || calibrationFactors[String(i)] || {};
-                const iceReading = calData.ice_reading || '';
-                const boilReading = calData.boil_reading || '';
+                const lowReading = calData.ice_reading || '';
+                const lowActual = calData.actual_ice !== undefined ? calData.actual_ice : '';
+                const highReading = calData.boil_reading || '';
+                const highActual = calData.actual_boil !== undefined ? calData.actual_boil : '';
                 const slope = calData.slope || 1.0;
                 const offset = calData.offset || 0.0;
                 const method = calData.calibration_method || 'none';
@@ -1133,26 +1145,50 @@
                             ${method === 'two_point' ? 'Calibrated' : method === 'simple' ? 'Simple' : 'Not Set'}
                         </span>
                     </div>
+                    <div style="font-size: 10px; color: #3b82f6; margin-bottom: 4px; font-weight: 500;">Low Reference Point</div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">
                         <div>
-                            <label style="font-size: 10px; color: #6b7280; display: block; margin-bottom: 2px;">Ice (0°C) Reading</label>
+                            <label style="font-size: 9px; color: #6b7280; display: block; margin-bottom: 2px;">Sensor Reading</label>
                             <input type="number"
-                                   id="ice-${i}"
-                                   value="${iceReading}"
+                                   id="low-reading-${i}"
+                                   value="${lowReading}"
                                    step="0.1"
-                                   placeholder="e.g. 2.5"
+                                   placeholder="Sensor shows"
                                    style="width: 100%; padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 11px;"
-                                   title="Raw sensor reading when in ice bath (0°C)">
+                                   title="What the sensor displays at low reference">
                         </div>
                         <div>
-                            <label style="font-size: 10px; color: #6b7280; display: block; margin-bottom: 2px;">Boil (100°C) Reading</label>
+                            <label style="font-size: 9px; color: #6b7280; display: block; margin-bottom: 2px;">Actual (Gun)</label>
                             <input type="number"
-                                   id="boil-${i}"
-                                   value="${boilReading}"
+                                   id="low-actual-${i}"
+                                   value="${lowActual}"
                                    step="0.1"
-                                   placeholder="e.g. 98.5"
+                                   placeholder="Gun shows"
                                    style="width: 100%; padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 11px;"
-                                   title="Raw sensor reading when in boiling water (~100°C)">
+                                   title="What your reference thermometer/gun shows">
+                        </div>
+                    </div>
+                    <div style="font-size: 10px; color: #ef4444; margin-bottom: 4px; font-weight: 500;">High Reference Point</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">
+                        <div>
+                            <label style="font-size: 9px; color: #6b7280; display: block; margin-bottom: 2px;">Sensor Reading</label>
+                            <input type="number"
+                                   id="high-reading-${i}"
+                                   value="${highReading}"
+                                   step="0.1"
+                                   placeholder="Sensor shows"
+                                   style="width: 100%; padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 11px;"
+                                   title="What the sensor displays at high reference">
+                        </div>
+                        <div>
+                            <label style="font-size: 9px; color: #6b7280; display: block; margin-bottom: 2px;">Actual (Gun)</label>
+                            <input type="number"
+                                   id="high-actual-${i}"
+                                   value="${highActual}"
+                                   step="0.1"
+                                   placeholder="Gun shows"
+                                   style="width: 100%; padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 11px;"
+                                   title="What your reference thermometer/gun shows">
                         </div>
                     </div>
                     <div style="display: flex; gap: 6px;">
@@ -1178,19 +1214,24 @@
 
         // Apply two-point calibration for a channel
         async function applyTwoPointCalibration(channel) {
-            const iceInput = document.getElementById(`ice-${channel}`);
-            const boilInput = document.getElementById(`boil-${channel}`);
-            const iceReading = parseFloat(iceInput.value);
-            const boilReading = parseFloat(boilInput.value);
+            const lowReadingInput = document.getElementById(`low-reading-${channel}`);
+            const lowActualInput = document.getElementById(`low-actual-${channel}`);
+            const highReadingInput = document.getElementById(`high-reading-${channel}`);
+            const highActualInput = document.getElementById(`high-actual-${channel}`);
+
+            const lowReading = parseFloat(lowReadingInput.value);
+            const lowActual = parseFloat(lowActualInput.value);
+            const highReading = parseFloat(highReadingInput.value);
+            const highActual = parseFloat(highActualInput.value);
 
             // Validate inputs
-            if (isNaN(iceReading) || isNaN(boilReading)) {
-                alert('Please enter both ice bath and boiling water readings');
+            if (isNaN(lowReading) || isNaN(lowActual) || isNaN(highReading) || isNaN(highActual)) {
+                alert('Please enter all 4 values: Low Reading, Low Actual, High Reading, High Actual');
                 return;
             }
 
-            if (iceReading === boilReading) {
-                alert('Ice and boiling readings cannot be the same');
+            if (lowReading === highReading) {
+                alert('Low and High sensor readings cannot be the same');
                 return;
             }
 
@@ -1199,10 +1240,10 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        ice_reading: iceReading,
-                        boil_reading: boilReading,
-                        actual_ice: 0.0,
-                        actual_boil: 100.0
+                        ice_reading: lowReading,
+                        boil_reading: highReading,
+                        actual_ice: lowActual,
+                        actual_boil: highActual
                     })
                 });
 
@@ -1252,9 +1293,11 @@
                 });
 
                 if (response.ok) {
-                    // Clear inputs
-                    document.getElementById(`ice-${channel}`).value = '';
-                    document.getElementById(`boil-${channel}`).value = '';
+                    // Clear all inputs
+                    document.getElementById(`low-reading-${channel}`).value = '';
+                    document.getElementById(`low-actual-${channel}`).value = '';
+                    document.getElementById(`high-reading-${channel}`).value = '';
+                    document.getElementById(`high-actual-${channel}`).value = '';
 
                     // Update status indicator
                     const statusEl = document.getElementById(`cal-status-${channel}`);
@@ -1277,6 +1320,70 @@
                 console.error('Error resetting calibration:', error);
                 alert(`Error: ${error.message}`);
             }
+        }
+
+        // Download calibration data as JSON file
+        async function downloadCalibration() {
+            try {
+                const response = await fetch('/api/calibration');
+                if (response.ok) {
+                    const data = await response.json();
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    const date = new Date().toISOString().slice(0, 10);
+                    a.download = `calibration_${date}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    console.log('Calibration data downloaded');
+                } else {
+                    alert('Failed to download calibration data');
+                }
+            } catch (error) {
+                console.error('Error downloading calibration:', error);
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Upload calibration data from JSON file
+        async function uploadCalibration(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+
+                // Upload each channel's calibration
+                for (const [channel, calData] of Object.entries(data)) {
+                    if (calData && typeof calData === 'object' && calData.calibration_method === 'two_point') {
+                        await fetch(`/api/calibration/${channel}/two_point`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                ice_reading: calData.ice_reading,
+                                boil_reading: calData.boil_reading,
+                                actual_ice: calData.actual_ice || 0,
+                                actual_boil: calData.actual_boil || 100
+                            })
+                        });
+                    }
+                }
+
+                // Refresh calibration controls to show uploaded data
+                await initializeCalibrationControls();
+                alert('Calibration data uploaded successfully!');
+                console.log('Calibration data uploaded');
+            } catch (error) {
+                console.error('Error uploading calibration:', error);
+                alert(`Error uploading calibration: ${error.message}`);
+            }
+
+            // Reset file input
+            event.target.value = '';
         }
 
         // Initialize Plotly graph - starts empty until data is available
