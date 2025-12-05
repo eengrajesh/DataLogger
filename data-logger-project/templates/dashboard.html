@@ -1269,8 +1269,10 @@
                     calibrationFactors[channel] = {
                         slope: result.slope,
                         offset: result.offset,
-                        ice_reading: iceReading,
-                        boil_reading: boilReading,
+                        ice_reading: lowReading,
+                        boil_reading: highReading,
+                        actual_ice: lowActual,
+                        actual_boil: highActual,
                         calibration_method: 'two_point'
                     };
 
