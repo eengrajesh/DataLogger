@@ -131,14 +131,18 @@ def apply_correction(channel, temperature):
     Applies the calibration correction to a temperature reading.
 
     Uses two-point linear calibration if available, otherwise falls back to simple factor.
+    If calibration_method is "none", returns the raw temperature unchanged.
 
     Formula: corrected_temp = slope * raw_temp + offset
     """
     cal_data = get_channel_calibration(channel)
 
-    method = cal_data.get("calibration_method", "simple")
+    method = cal_data.get("calibration_method", "none")
 
-    if method == "two_point":
+    if method == "none":
+        # No calibration - return raw temperature unchanged
+        return temperature
+    elif method == "two_point":
         # Use linear calibration: y = mx + b
         slope = cal_data.get("slope", 1.0)
         offset = cal_data.get("offset", 0.0)
